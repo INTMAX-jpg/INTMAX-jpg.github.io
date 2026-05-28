@@ -3,15 +3,22 @@ export function initMasonry() {
   var masonryContainer = document.querySelector("#masonry-container");
   if (!loadingPlaceholder || !masonryContainer) return;
 
+  var masonry = null;
+  var layoutTimer = null;
+  var eagerCount = 6;
+
   loadingPlaceholder.style.display = "block";
   masonryContainer.style.display = "none";
 
   loadGalleryImages()
+    .then(function () {
+      revealMasonryContainer();
+      initializeMasonryLayout();
+      startProgressiveImageLoading();
+    })
     .catch(function () {
       renderGalleryMessage("Photo loading failed. Please check images/gallery/.");
-    })
-    .finally(function () {
-      prepareMasonryLayout();
+      revealMasonryContainer();
     });
 
   function loadGalleryImages() {
@@ -19,8 +26,8 @@ export function initMasonry() {
       return Promise.resolve();
     }
 
-    var existingImages = masonryContainer.querySelectorAll(".masonry-item img");
-    if (existingImages.length > 0) {
+    var existingItems = masonryContainer.querySelectorAll(".masonry-item");
+    if (existingItems.length > 0) {
       masonryContainer.dataset.galleryLoaded = "true";
       return Promise.resolve();
     }
@@ -32,23 +39,60 @@ export function initMasonry() {
       }
 
       var fragment = document.createDocumentFragment();
-      files.forEach(function (file) {
-        var item = document.createElement("div");
-        item.className = "masonry-item";
-
-        var img = document.createElement("img");
-        img.src = file.url;
-        img.alt = file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
-        img.loading = "lazy";
-        img.decoding = "async";
-
-        item.appendChild(img);
-        fragment.appendChild(item);
+      files.forEach(function (file, index) {
+        fragment.appendChild(createGalleryItem(file, index));
       });
 
       masonryContainer.appendChild(fragment);
       masonryContainer.dataset.galleryLoaded = "true";
     });
+  }
+
+  function createGalleryItem(file, index) {
+    var item = document.createElement("div");
+    item.className = "masonry-item masonry-item-loading";
+
+    var shell = document.createElement("div");
+    shell.className = "masonry-image-shell loading";
+    shell.style.setProperty("--gallery-ratio", getPlaceholderRatio(index));
+
+    var img = document.createElement("img");
+    img.alt = file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
+    img.decoding = "async";
+    img.loading = index < eagerCount ? "eager" : "lazy";
+    img.dataset.src = file.url;
+    if (index < 2) {
+      img.fetchPriority = "high";
+    }
+
+    img.addEventListener("load", function () {
+      if (img.naturalWidth && img.naturalHeight) {
+        shell.style.setProperty(
+          "--gallery-ratio",
+          img.naturalWidth + " / " + img.naturalHeight,
+        );
+      }
+      item.classList.remove("masonry-item-loading");
+      item.classList.add("masonry-item-loaded");
+      shell.classList.remove("loading");
+      scheduleLayout();
+    });
+
+    img.addEventListener("error", function () {
+      item.classList.remove("masonry-item-loading");
+      item.classList.add("masonry-item-error");
+      shell.classList.remove("loading");
+      scheduleLayout();
+    });
+
+    shell.appendChild(img);
+    item.appendChild(shell);
+    return item;
+  }
+
+  function getPlaceholderRatio(index) {
+    var ratios = ["4 / 3", "3 / 4", "1 / 1", "5 / 4", "4 / 5", "16 / 10"];
+    return ratios[index % ratios.length];
   }
 
   function getGalleryFiles() {
@@ -121,66 +165,68 @@ export function initMasonry() {
     masonryContainer.dataset.galleryLoaded = "true";
   }
 
-  function prepareMasonryLayout() {
-    var images = document.querySelectorAll(
-      "#masonry-container .masonry-item img",
-    );
-    var loadedCount = 0;
+  function revealMasonryContainer() {
+    loadingPlaceholder.style.opacity = 0;
+    setTimeout(function () {
+      loadingPlaceholder.style.display = "none";
+    }, 100);
+    masonryContainer.style.display = "block";
+    masonryContainer.style.opacity = 1;
+  }
 
-    if (!images.length) {
-      initializeMasonryLayout(false);
+  function initializeMasonryLayout() {
+    if (!masonryContainer.querySelector(".masonry-item")) return;
+
+    masonry = new MiniMasonry({
+      baseWidth: window.innerWidth >= 768 ? 255 : 150,
+      container: masonryContainer,
+      gutterX: 10,
+      gutterY: 10,
+      surroundingGutter: false,
+    });
+    masonry.layout();
+  }
+
+  function startProgressiveImageLoading() {
+    var images = Array.prototype.slice.call(
+      masonryContainer.querySelectorAll(".masonry-item img[data-src]"),
+    );
+
+    images.slice(0, eagerCount).forEach(loadImage);
+
+    if (!("IntersectionObserver" in window)) {
+      images.slice(eagerCount).forEach(loadImage);
       return;
     }
 
-    function onImageLoad() {
-      loadedCount++;
-      if (loadedCount === images.length) {
-        initializeMasonryLayout(true);
-      }
-    }
+    var observer = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          observer.unobserve(entry.target);
+          var img = entry.target.querySelector("img[data-src]");
+          if (img) loadImage(img);
+        });
+      },
+      { rootMargin: "900px 0px" },
+    );
 
-    for (var i = 0; i < images.length; i++) {
-      var img = images[i];
-      if (img.complete) {
-        onImageLoad();
-      } else {
-        img.addEventListener("load", onImageLoad);
-        img.addEventListener("error", onImageLoad);
-      }
-    }
-
-    if (loadedCount === images.length) {
-      initializeMasonryLayout(true);
-    }
+    images.slice(eagerCount).forEach(function (img) {
+      observer.observe(img.closest(".masonry-item"));
+    });
   }
 
-  function initializeMasonryLayout(hasImages) {
-    loadingPlaceholder.style.opacity = 0;
-    setTimeout(() => {
-      loadingPlaceholder.style.display = "none";
-      masonryContainer.style.display = "block";
-      if (!hasImages) {
-        masonryContainer.style.opacity = 1;
-        return;
-      }
+  function loadImage(img) {
+    if (!img || img.src) return;
+    img.src = img.dataset.src;
+  }
 
-      var screenWidth = window.innerWidth;
-      var baseWidth;
-      if (screenWidth >= 768) {
-        baseWidth = 255;
-      } else {
-        baseWidth = 150;
-      }
-      var masonry = new MiniMasonry({
-        baseWidth: baseWidth,
-        container: masonryContainer,
-        gutterX: 10,
-        gutterY: 10,
-        surroundingGutter: false,
-      });
+  function scheduleLayout() {
+    if (!masonry) return;
+    clearTimeout(layoutTimer);
+    layoutTimer = setTimeout(function () {
       masonry.layout();
-      masonryContainer.style.opacity = 1;
-    }, 100);
+    }, 80);
   }
 }
 
