@@ -5,7 +5,7 @@ export function initMasonry() {
 
   var masonry = null;
   var layoutTimer = null;
-  var eagerCount = 6;
+  var eagerCount = 3;
 
   loadingPlaceholder.style.display = "block";
   masonryContainer.style.display = "none";
