@@ -6818,3 +6818,105 @@ html.is-animating .transition-fade-down {
     width: 100%;
   }
 }
+
+@keyframes zixi-breathing-pop {
+  0% {
+    transform: translateY(-2px) scale(1.012);
+  }
+  50% {
+    transform: translateY(-4px) scale(1.026);
+  }
+  100% {
+    transform: translateY(-2px) scale(1.012);
+  }
+}
+.home-article-item,
+.home-sidebar-container .sidebar-content,
+.home-sidebar-container .sidebar-links,
+.archive-container,
+.blog-comment-card,
+.guestbook-history-container,
+.guestbook-history-item,
+.post-engagement-panel .post-action-button,
+.home-comment-button,
+.blog-auth-button,
+.right-bottom-tools,
+.masonry-item,
+.page-template-container,
+.article-copyright-info-container,
+.navbar-item > a,
+.drawer-navbar-item > a {
+  transform-origin: center;
+  transition: transform 0.24s ease, box-shadow 0.24s ease, border-color 0.24s ease, filter 0.24s ease;
+  will-change: transform;
+}
+.home-article-item:hover,
+.home-sidebar-container .sidebar-content:hover,
+.home-sidebar-container .sidebar-links:hover,
+.archive-container:hover,
+.blog-comment-card:hover,
+.guestbook-history-container:hover,
+.guestbook-history-item:hover,
+.post-engagement-panel .post-action-button:hover,
+.home-comment-button:hover,
+.blog-auth-button:hover,
+.right-bottom-tools:hover,
+.masonry-item:hover,
+.page-template-container:hover,
+.article-copyright-info-container:hover,
+.navbar-item > a:hover,
+.drawer-navbar-item > a:hover {
+  animation: zixi-breathing-pop 1.6s ease-in-out infinite;
+  filter: saturate(1.04);
+}
+.home-article-item:hover,
+.home-sidebar-container .sidebar-content:hover,
+.home-sidebar-container .sidebar-links:hover,
+.archive-container:hover,
+.blog-comment-card:hover,
+.guestbook-history-container:hover,
+.guestbook-history-item:hover,
+.masonry-item:hover,
+.page-template-container:hover,
+.article-copyright-info-container:hover {
+  box-shadow: var(--redefine-box-shadow-hover);
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-article-item,
+  .home-sidebar-container .sidebar-content,
+  .home-sidebar-container .sidebar-links,
+  .archive-container,
+  .blog-comment-card,
+  .guestbook-history-container,
+  .guestbook-history-item,
+  .post-engagement-panel .post-action-button,
+  .home-comment-button,
+  .blog-auth-button,
+  .right-bottom-tools,
+  .masonry-item,
+  .page-template-container,
+  .article-copyright-info-container,
+  .navbar-item > a,
+  .drawer-navbar-item > a {
+    transition: none;
+  }
+  .home-article-item:hover,
+  .home-sidebar-container .sidebar-content:hover,
+  .home-sidebar-container .sidebar-links:hover,
+  .archive-container:hover,
+  .blog-comment-card:hover,
+  .guestbook-history-container:hover,
+  .guestbook-history-item:hover,
+  .post-engagement-panel .post-action-button:hover,
+  .home-comment-button:hover,
+  .blog-auth-button:hover,
+  .right-bottom-tools:hover,
+  .masonry-item:hover,
+  .page-template-container:hover,
+  .article-copyright-info-container:hover,
+  .navbar-item > a:hover,
+  .drawer-navbar-item > a:hover {
+    animation: none;
+    transform: none;
+  }
+}

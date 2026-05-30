@@ -174,6 +174,7 @@ async function initAuth() {
       supabase.auth.onAuthStateChange((_event, session) => {
         currentSession = session;
         updateAuthUI(session);
+        randomizeHomeHeroQuote();
         if (activePostContext) renderCommentArea(activePostContext, true);
         initSiteGuestbook(true);
       });
@@ -525,6 +526,46 @@ async function submitSupabaseComment(context) {
 }
 
 
+
+const homeHeroQuotes = [
+  {
+    title: "Stay Hungry, Stay Foolish.",
+    subtitle: "求知若渴，虚心若愚",
+  },
+  {
+    title: "Life happens for you, not to you.",
+    subtitle: "万事发生皆有利于我",
+  },
+  {
+    title: "Ready, fire, aim.",
+    subtitle: "先开枪，再瞄准",
+  },
+];
+
+function randomizeHomeHeroQuote() {
+  if (!isHomePage()) return;
+
+  const description = document.querySelector(".home-banner-container .description");
+  const subtitle = document.querySelector("#subtitle");
+  if (!description || !subtitle) return;
+
+  const quote = homeHeroQuotes[Math.floor(Math.random() * homeHeroQuotes.length)];
+  const titleNode = Array.from(description.childNodes).find((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
+
+  if (titleNode) {
+    titleNode.textContent = `\n            ${quote.title}\n            `;
+  } else {
+    description.insertBefore(document.createTextNode(quote.title), description.firstChild);
+  }
+
+  subtitle.textContent = quote.subtitle;
+  description.querySelectorAll(".typed-cursor").forEach((cursor) => cursor.remove());
+
+  if (window.theme?.home_banner?.subtitle?.text) {
+    window.theme.home_banner.title = quote.title;
+    window.theme.home_banner.subtitle.text = [quote.subtitle];
+  }
+}
 const guestbookEmojis = ["✨", "👏", "📷", "💡", "🌿", "🔥", "😊", "🚀", "☕", "🎧"];
 
 function isHomePage() {
@@ -920,6 +961,7 @@ function initSiteGuestbook(force = false) {
   }
 }
 function initBlogInteractions() {
+  randomizeHomeHeroQuote();
   initAuth();
   initSiteGuestbook();
   const context = getPostContext();
