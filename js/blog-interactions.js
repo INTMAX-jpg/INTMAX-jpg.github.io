@@ -542,29 +542,37 @@ const homeHeroQuotes = [
   },
 ];
 
-function randomizeHomeHeroQuote() {
-  if (!isHomePage()) return;
-
+function applyHomeHeroQuote(quote) {
   const description = document.querySelector(".home-banner-container .description");
   const subtitle = document.querySelector("#subtitle");
   if (!description || !subtitle) return;
 
-  const quote = homeHeroQuotes[Math.floor(Math.random() * homeHeroQuotes.length)];
   const titleNode = Array.from(description.childNodes).find((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
 
   if (titleNode) {
     titleNode.textContent = `\n            ${quote.title}\n            `;
   } else {
-    description.insertBefore(document.createTextNode(quote.title), description.firstChild);
+    description.insertBefore(document.createTextNode(`\n            ${quote.title}\n            `), description.firstChild);
   }
 
-  subtitle.textContent = quote.subtitle;
+  const stableSubtitle = subtitle.cloneNode(false);
+  stableSubtitle.id = "subtitle";
+  stableSubtitle.textContent = quote.subtitle;
+  subtitle.replaceWith(stableSubtitle);
   description.querySelectorAll(".typed-cursor").forEach((cursor) => cursor.remove());
 
   if (window.theme?.home_banner?.subtitle?.text) {
     window.theme.home_banner.title = quote.title;
     window.theme.home_banner.subtitle.text = [quote.subtitle];
   }
+}
+
+function randomizeHomeHeroQuote() {
+  if (!isHomePage()) return;
+
+  const quote = homeHeroQuotes[Math.floor(Math.random() * homeHeroQuotes.length)];
+  applyHomeHeroQuote(quote);
+  window.setTimeout(() => applyHomeHeroQuote(quote), 800);
 }
 const guestbookEmojis = ["✨", "👏", "📷", "💡", "🌿", "🔥", "😊", "🚀", "☕", "🎧"];
 
