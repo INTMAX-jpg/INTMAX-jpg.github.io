@@ -158,6 +158,9 @@
   --home-banner-text-color: #fff;
   --home-banner-icons-container-border-color: rgba(255,255,255,0.35);
   --home-banner-icons-container-background-color: rgba(255,255,255,0.3);
+  --home-stat-number-color: rgba(31, 36, 38, 0.96);
+  --home-stat-label-color: rgba(70, 78, 81, 0.82);
+  --home-stat-number-shadow: none;
   --redefine-box-shadow: var(--shadow-color-2) 0px 6px 24px 0px, var(--shadow-color-1) 0px 0px 0px 1px;
   --redefine-box-shadow-hover: var(--shadow-color-2) 0px 6px 24px 0px, var(--shadow-color-1) 0px 0px 0px 1px, var(--shadow-color-1) 0px 0px 0px 1px inset;
   --redefine-box-shadow-flat: var(--shadow-color-2) 0px 1px 4px 0px, var(--shadow-color-1) 0px 0px 0px 1px;
@@ -205,6 +208,9 @@
   --home-banner-text-color: #fff;
   --home-banner-icons-container-border-color: rgba(255,255,255,0.35);
   --home-banner-icons-container-background-color: rgba(255,255,255,0.3);
+  --home-stat-number-color: rgba(31, 36, 38, 0.96);
+  --home-stat-label-color: rgba(70, 78, 81, 0.82);
+  --home-stat-number-shadow: none;
   --redefine-box-shadow: var(--shadow-color-2) 0px 6px 24px 0px, var(--shadow-color-1) 0px 0px 0px 1px;
   --redefine-box-shadow-hover: var(--shadow-color-2) 0px 6px 24px 0px, var(--shadow-color-1) 0px 0px 0px 1px, var(--shadow-color-1) 0px 0px 0px 1px inset;
   --redefine-box-shadow-flat: var(--shadow-color-2) 0px 1px 4px 0px, var(--shadow-color-1) 0px 0px 0px 1px;
@@ -252,6 +258,9 @@
   --home-banner-text-color: rgba(236, 236, 216, 0.96);
   --home-banner-icons-container-border-color: rgba(197,197,197,0.35);
   --home-banner-icons-container-background-color: rgba(197,197,197,0.3);
+  --home-stat-number-color: rgba(230, 230, 220, 0.88);
+  --home-stat-label-color: rgba(197, 197, 205, 0.68);
+  --home-stat-number-shadow: 0 1px 10px rgba(0, 0, 0, 0.28);
   --redefine-box-shadow: var(--shadow-color-2) 0px 6px 24px 0px, var(--shadow-color-1) 0px 0px 0px 1px;
   --redefine-box-shadow-hover: var(--shadow-color-2) 0px 6px 24px 0px, var(--shadow-color-1) 0px 0px 0px 1px, var(--shadow-color-1) 0px 0px 0px 1px inset;
   --redefine-box-shadow-flat: var(--shadow-color-2) 0px 1px 4px 0px, var(--shadow-color-1) 0px 0px 0px 1px;
@@ -6117,6 +6126,26 @@ html.is-animating .transition-fade-down {
   text-align: center;
   font-size: 0.8rem;
   color: var(--third-text-color);
+}
+.home-sidebar-container .sidebar-content .statistics .item {
+  min-width: 0;
+  color: var(--home-stat-number-color);
+}
+.home-sidebar-container .sidebar-content .statistics .item .number {
+  color: var(--home-stat-number-color) !important;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.08;
+  text-shadow: var(--home-stat-number-shadow);
+}
+.home-sidebar-container .sidebar-content .statistics .item .label {
+  color: var(--home-stat-label-color) !important;
+}
+.home-sidebar-container .sidebar-content .statistics .home-likes-stat .home-like-value {
+  color: var(--home-stat-number-color);
+}
+.home-sidebar-container .sidebar-content .statistics .item:hover .number,
+.home-sidebar-container .sidebar-content .statistics .item:hover .label {
+  color: var(--primary-color) !important;
 }
 .home-sidebar-container .sidebar-links {
   overflow: hidden;
