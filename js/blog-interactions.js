@@ -1,6 +1,7 @@
 const interactionConfig = {
   repo: "INTMAX-jpg/INTMAX-jpg.github.io",
   likeStorageKey: "ZIXI_BLOG_LOCAL_LIKES",
+  commentsTable: "post_comments",
 };
 
 const authConfig = {
@@ -12,6 +13,7 @@ let supabaseClientPromise = null;
 let currentSession = null;
 let authInitialized = false;
 let authListenerInitialized = false;
+let activePostContext = null;
 
 function getSupabaseClient() {
   if (!supabaseClientPromise) {
@@ -170,6 +172,7 @@ async function initAuth() {
       supabase.auth.onAuthStateChange((_event, session) => {
         currentSession = session;
         updateAuthUI(session);
+        if (activePostContext) renderCommentArea(activePostContext, true);
       });
     }
   } catch (error) {
@@ -262,6 +265,31 @@ function createIssueUrl(context) {
   return `https://github.com/${interactionConfig.repo}/issues/new?title=${title}&body=${body}&labels=comment`;
 }
 
+function escapeHTML(value) {
+  const element = document.createElement("div");
+  element.textContent = value || "";
+  return element.innerHTML;
+}
+
+function formatCommentTime(value) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function renderUserAvatar(userName, avatarUrl) {
+  if (avatarUrl) {
+    return `<span class="supabase-comment-avatar" style="background-image:url('${escapeHTML(avatarUrl)}')"></span>`;
+  }
+
+  return `<span class="supabase-comment-avatar">${escapeHTML((userName || "U").slice(0, 1).toUpperCase())}</span>`;
+}
+
 function createEngagementPanel(context) {
   if (document.querySelector(".post-engagement-panel")) return;
 
@@ -338,9 +366,15 @@ function jumpToComments() {
   });
 }
 
-function renderCommentArea(context) {
+function renderCommentArea(context, force = false) {
   const container = document.querySelector(".comments-container");
-  if (!container || container.dataset.blogCommentsReady === "true") return;
+  if (!container) return;
+  if (container.dataset.blogCommentsReady === "true" && !force) return;
+
+  activePostContext = context;
+  const user = currentSession?.user || null;
+  const displayName = getUserDisplayName(user);
+  const avatar = getUserAvatar(user);
 
   container.dataset.blogCommentsReady = "true";
   container.innerHTML = `
@@ -348,53 +382,151 @@ function renderCommentArea(context) {
     <div class="comment-area-title w-full my-1.5 md:my-2.5 text-xl md:text-3xl font-bold">
       评论
     </div>
-    <div class="blog-comment-card">
+    <div class="blog-comment-card supabase-comment-card">
       <div class="blog-comment-card-header">
         <div>
-          <div class="blog-comment-eyebrow">GitHub Issues</div>
-          <div class="blog-comment-title">留下你的想法</div>
+          <div class="blog-comment-eyebrow">Supabase Auth</div>
+          <div class="blog-comment-title">用 GitHub 身份参与讨论</div>
         </div>
-        <a class="blog-comment-open" href="${createIssueUrl(context)}" target="_blank" rel="noopener">
-          <i class="fa-brands fa-github"></i>
-          <span>打开 GitHub</span>
-        </a>
+        ${user ? `
+          <div class="supabase-comment-user">
+            ${renderUserAvatar(displayName, avatar)}
+            <span>${escapeHTML(displayName)}</span>
+          </div>
+        ` : `
+          <button class="blog-comment-open supabase-comment-login" type="button">
+            <i class="fa-brands fa-github"></i>
+            <span>GitHub 登录</span>
+          </button>
+        `}
       </div>
       <p class="blog-comment-note">
-        评论会与当前文章链接到 GitHub Issues。若下方嵌入区没有出现，请先在 GitHub 中留言，或安装 utterances 应用以启用站内评论。
+        ${user ? "当前评论会使用你的 GitHub 昵称和头像。" : "请先登录 GitHub，再发布评论。登录状态会与顶部导航栏同步。"}
       </p>
-      <div class="utterances-root"></div>
+      <div class="supabase-comment-composer" ${user ? "" : "hidden"}>
+        <textarea class="supabase-comment-input" maxlength="1000" rows="4" placeholder="写下你的想法..."></textarea>
+        <div class="supabase-comment-actions">
+          <span class="supabase-comment-hint">最多 1000 字</span>
+          <button class="post-action-button supabase-comment-submit" type="button">
+            <i class="fa-regular fa-paper-plane"></i>
+            <span>发布评论</span>
+          </button>
+        </div>
+      </div>
+      <div class="supabase-comment-status" role="status"></div>
+      <div class="supabase-comment-list"></div>
     </div>
   `;
 
-  loadUtterances();
+  const loginButton = container.querySelector(".supabase-comment-login");
+  if (loginButton) loginButton.addEventListener("click", signInWithGitHub);
+
+  const submitButton = container.querySelector(".supabase-comment-submit");
+  if (submitButton) {
+    submitButton.addEventListener("click", () => submitSupabaseComment(context));
+  }
+
+  loadSupabaseComments(context);
 }
 
-function loadUtterances() {
-  const root = document.querySelector(".utterances-root");
-  if (!root || root.dataset.utterancesLoaded === "true") return;
+async function loadSupabaseComments(context) {
+  const list = document.querySelector(".supabase-comment-list");
+  const status = document.querySelector(".supabase-comment-status");
+  if (!list || !status) return;
 
-  root.dataset.utterancesLoaded = "true";
+  status.textContent = "正在加载评论...";
 
-  const script = document.createElement("script");
-  script.src = "https://utteranc.es/client.js";
-  script.async = true;
-  script.crossOrigin = "anonymous";
-  script.setAttribute("repo", interactionConfig.repo);
-  script.setAttribute("issue-term", "pathname");
-  script.setAttribute("label", "comment");
-  script.setAttribute("theme", getUtterancesTheme());
-  root.appendChild(script);
+  try {
+    const supabase = await getSupabaseClient();
+    const { data, error } = await supabase
+      .from(interactionConfig.commentsTable)
+      .select("id, body, user_name, user_avatar, created_at")
+      .eq("post_path", context.path)
+      .order("created_at", { ascending: true });
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      list.innerHTML = `<div class="supabase-comment-empty">还没有评论，欢迎留下第一条。</div>`;
+      status.textContent = "";
+      return;
+    }
+
+    list.innerHTML = data.map((comment) => `
+      <article class="supabase-comment-item">
+        ${renderUserAvatar(comment.user_name, comment.user_avatar)}
+        <div class="supabase-comment-body">
+          <div class="supabase-comment-meta">
+            <span>${escapeHTML(comment.user_name || "GitHub User")}</span>
+            <time>${escapeHTML(formatCommentTime(comment.created_at))}</time>
+          </div>
+          <p>${escapeHTML(comment.body).replace(/\n/g, "<br>")}</p>
+        </div>
+      </article>
+    `).join("");
+    status.textContent = "";
+  } catch (error) {
+    console.warn("加载评论失败", error);
+    status.textContent = "评论表还没有配置，或当前 RLS 策略不允许读取。请先在 Supabase 执行仓库里的 supabase/post_comments.sql。";
+    list.innerHTML = "";
+  }
 }
 
-function getUtterancesTheme() {
-  const themeName = document.documentElement.getAttribute("data-theme");
-  return themeName === "dark" ? "github-dark" : "github-light";
+async function submitSupabaseComment(context) {
+  const user = currentSession?.user;
+  const input = document.querySelector(".supabase-comment-input");
+  const status = document.querySelector(".supabase-comment-status");
+  const submitButton = document.querySelector(".supabase-comment-submit");
+
+  if (!user) {
+    await signInWithGitHub();
+    return;
+  }
+
+  const body = input?.value.trim() || "";
+  if (!body) {
+    status.textContent = "请先输入评论内容。";
+    return;
+  }
+
+  if (body.length > 1000) {
+    status.textContent = "评论不能超过 1000 字。";
+    return;
+  }
+
+  status.textContent = "正在发布...";
+  if (submitButton) submitButton.disabled = true;
+
+  try {
+    const supabase = await getSupabaseClient();
+    const { error } = await supabase.from(interactionConfig.commentsTable).insert({
+      post_path: context.path,
+      post_title: context.title,
+      body,
+      user_id: user.id,
+      user_name: getUserDisplayName(user),
+      user_avatar: getUserAvatar(user),
+    });
+
+    if (error) throw error;
+
+    input.value = "";
+    status.textContent = "评论已发布。";
+    await loadSupabaseComments(context);
+  } catch (error) {
+    console.warn("发布评论失败", error);
+    status.textContent = "发布失败。请确认 Supabase 已创建 post_comments 表并启用正确的 RLS 策略。";
+  } finally {
+    if (submitButton) submitButton.disabled = false;
+  }
 }
 
 function initBlogInteractions() {
   initAuth();
   const context = getPostContext();
   if (!context) return;
+
+  activePostContext = context;
 
   createEngagementPanel(context);
   enhancePostTools(context);
