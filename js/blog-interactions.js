@@ -557,13 +557,26 @@ function applyHomeHeroQuote(quote) {
 
   const stableSubtitle = subtitle.cloneNode(false);
   stableSubtitle.id = "subtitle";
-  stableSubtitle.textContent = quote.subtitle;
   subtitle.replaceWith(stableSubtitle);
   description.querySelectorAll(".typed-cursor").forEach((cursor) => cursor.remove());
 
   if (window.theme?.home_banner?.subtitle?.text) {
     window.theme.home_banner.title = quote.title;
     window.theme.home_banner.subtitle.text = [quote.subtitle];
+  }
+
+  if (window.Typed) {
+    new Typed("#subtitle", {
+      strings: [quote.subtitle],
+      typeSpeed: window.theme?.home_banner?.subtitle?.typing_speed || 100,
+      smartBackspace: window.theme?.home_banner?.subtitle?.smart_backspace || false,
+      backSpeed: window.theme?.home_banner?.subtitle?.backing_speed || 80,
+      backDelay: window.theme?.home_banner?.subtitle?.backing_delay || 1500,
+      loop: window.theme?.home_banner?.subtitle?.loop || false,
+      startDelay: window.theme?.home_banner?.subtitle?.starting_delay || 500,
+    });
+  } else {
+    stableSubtitle.textContent = quote.subtitle;
   }
 }
 
@@ -572,7 +585,6 @@ function randomizeHomeHeroQuote() {
 
   const quote = homeHeroQuotes[Math.floor(Math.random() * homeHeroQuotes.length)];
   applyHomeHeroQuote(quote);
-  window.setTimeout(() => applyHomeHeroQuote(quote), 800);
 }
 const guestbookEmojis = ["✨", "👏", "📷", "💡", "🌿", "🔥", "😊", "🚀", "☕", "🎧"];
 
