@@ -699,7 +699,7 @@ async function incrementHomeLikes(item) {
     void number.offsetWidth;
     number.classList.add("is-popping");
     createHomeLikeBurst(number);
-    window.setTimeout(() => number.classList.remove("is-popping"), 620);
+    window.setTimeout(() => number.classList.remove("is-popping"), 1000);
   }
 
   try {

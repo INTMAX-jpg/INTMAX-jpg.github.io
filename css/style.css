@@ -6670,21 +6670,14 @@ html.is-animating .transition-fade-down {
   opacity: 0;
   transform: scale(0.58);
 }
-.home-like-count:hover .home-like-value,
-.home-likes-stat:focus-visible .home-like-value,
 .home-like-count.is-popping .home-like-value {
   opacity: 0;
   transform: translateY(2px) scale(0.84);
 }
-.home-like-count:hover .home-like-heart-icon,
-.home-likes-stat:focus-visible .home-like-heart-icon {
-  opacity: 1;
-  transform: scale(1.05);
-  animation: zixi-home-heartbeat 0.95s ease-in-out infinite;
-}
 .home-like-count.is-popping .home-like-heart-icon {
   opacity: 1;
   transform: scale(1.15);
+  animation: zixi-home-heartbeat 0.95s ease-in-out infinite;
 }
 .home-like-burst-heart {
   position: absolute;
