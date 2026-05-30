@@ -1,6 +1,7 @@
 const interactionConfig = {
   repo: "INTMAX-jpg/INTMAX-jpg.github.io",
   likeStorageKey: "ZIXI_BLOG_LOCAL_LIKES",
+  siteLikeStorageKey: "ZIXI_SITE_LIKE_COUNT",
   commentsTable: "post_comments",
   siteCommentsTable: "site_comments",
   siteCommentLikesTable: "site_comment_likes",
@@ -596,6 +597,95 @@ function isCommentsPage() {
   return window.location.pathname.replace(/\/index\.html$/, "/") === "/comments/";
 }
 
+function readSiteLikeCount() {
+  const value = Number(localStorage.getItem(interactionConfig.siteLikeStorageKey));
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+}
+
+function writeSiteLikeCount(count) {
+  localStorage.setItem(interactionConfig.siteLikeStorageKey, String(Math.max(0, count)));
+}
+
+function fitHomeLikeCount(node, count) {
+  const length = String(count).length;
+  const size = Math.max(0.62, Math.min(1.5, 1.48 - Math.max(0, length - 2) * 0.12));
+  node.style.fontSize = `${size}rem`;
+}
+
+function renderHomeLikeCount(count = readSiteLikeCount()) {
+  document.querySelectorAll("[data-home-likes-count]").forEach((node) => {
+    const value = node.querySelector(".home-like-value");
+    if (value) value.textContent = String(count);
+    fitHomeLikeCount(node, count);
+  });
+}
+
+function createHomeLikeBurst(container) {
+  for (let index = 0; index < 9; index += 1) {
+    const heart = document.createElement("span");
+    heart.className = "home-like-burst-heart";
+    heart.textContent = "\u2665";
+    heart.style.setProperty("--x", `${Math.round((Math.random() - 0.5) * 58)}px`);
+    heart.style.setProperty("--y", `${Math.round(-34 - Math.random() * 48)}px`);
+    heart.style.setProperty("--r", `${Math.round((Math.random() - 0.5) * 36)}deg`);
+    heart.style.animationDelay = `${index * 34}ms`;
+    container.appendChild(heart);
+    heart.addEventListener("animationend", () => heart.remove(), { once: true });
+  }
+}
+
+function incrementHomeLikes(item) {
+  const count = readSiteLikeCount() + 1;
+  writeSiteLikeCount(count);
+  renderHomeLikeCount(count);
+
+  const number = item.querySelector("[data-home-likes-count]");
+  if (number) {
+    number.classList.remove("is-popping");
+    void number.offsetWidth;
+    number.classList.add("is-popping");
+    createHomeLikeBurst(number);
+  }
+}
+
+function initHomeLikes() {
+  if (!isHomePage()) return;
+
+  document.querySelectorAll('.statistics a[href="/tags"], .statistics .home-likes-stat').forEach((item) => {
+    item.classList.add("home-likes-stat");
+    item.setAttribute("href", "#");
+    item.setAttribute("role", "button");
+    item.setAttribute("aria-label", "Like this blog");
+
+    const number = item.querySelector(".number");
+    const label = item.querySelector(".label");
+
+    if (number && !number.dataset.homeLikesCount) {
+      number.dataset.homeLikesCount = "true";
+      number.classList.add("home-like-count");
+      number.innerHTML = '<span class="home-like-value">0</span><i class="fa-solid fa-heart home-like-heart-icon" aria-hidden="true"></i>';
+    }
+
+    if (label) label.textContent = "Likes";
+
+    if (!item.dataset.homeLikesBound) {
+      item.dataset.homeLikesBound = "true";
+      item.addEventListener("click", (event) => {
+        event.preventDefault();
+        incrementHomeLikes(item);
+      });
+      item.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          incrementHomeLikes(item);
+        }
+      });
+    }
+  });
+
+  renderHomeLikeCount();
+}
+
 function getCurrentGuestbookUser() {
   const user = currentSession?.user || null;
   if (!user) return null;
@@ -634,6 +724,8 @@ async function updateSiteCommentCount() {
 
 function initHomeGuestbook() {
   if (!isHomePage()) return;
+
+  initHomeLikes();
 
   document.querySelectorAll('.statistics a[href="/categories"]').forEach((item) => {
     item.setAttribute("href", "/comments/");

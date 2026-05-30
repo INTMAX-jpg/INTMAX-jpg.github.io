@@ -6596,6 +6596,101 @@ html.is-animating .transition-fade-down {
 .site-comments-stat:hover .number {
   color: var(--primary-color);
 }
+.home-likes-stat {
+  position: relative;
+  overflow: visible;
+  cursor: pointer;
+  text-decoration: none;
+}
+.home-likes-stat .label,
+.home-likes-stat .home-like-value,
+.home-likes-stat .home-like-heart-icon {
+  transition: color 0.18s ease, opacity 0.18s ease, transform 0.22s ease;
+}
+.home-likes-stat:hover .label,
+.home-likes-stat:focus-visible .label {
+  color: var(--primary-color);
+}
+.home-like-count {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  max-width: 74px;
+  height: 34px;
+  min-width: 0;
+  line-height: 1;
+  overflow: visible;
+}
+.home-like-value {
+  display: block;
+  max-width: 100%;
+  color: var(--second-text-color);
+  overflow: hidden;
+  text-align: center;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+.home-like-heart-icon {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--primary-color);
+  font-size: 1.3rem;
+  opacity: 0;
+  transform: scale(0.58);
+}
+.home-likes-stat:hover .home-like-value,
+.home-likes-stat:focus-visible .home-like-value {
+  opacity: 0;
+  transform: translateY(2px) scale(0.84);
+}
+.home-likes-stat:hover .home-like-heart-icon,
+.home-likes-stat:focus-visible .home-like-heart-icon {
+  opacity: 1;
+  transform: scale(1.05);
+  animation: zixi-home-heartbeat 0.95s ease-in-out infinite;
+}
+.home-like-count.is-popping .home-like-heart-icon {
+  opacity: 1;
+  transform: scale(1.15);
+}
+.home-like-burst-heart {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  z-index: 2;
+  color: var(--primary-color);
+  font-size: 0.86rem;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+  text-shadow: 0 6px 16px rgba(163, 31, 52, 0.24);
+  transform: translate(-50%, -50%);
+  animation: zixi-home-like-burst 0.9s cubic-bezier(0.18, 0.72, 0.22, 1) forwards;
+}
+@keyframes zixi-home-heartbeat {
+  0%, 100% {
+    transform: scale(0.98);
+  }
+  42% {
+    transform: scale(1.18);
+  }
+}
+@keyframes zixi-home-like-burst {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.5) rotate(0deg);
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y))) scale(1.18) rotate(var(--r));
+  }
+}
 .guestbook-modal[hidden] {
   display: none;
 }
