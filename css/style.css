@@ -2130,9 +2130,6 @@ html.is-animating .transition-navbar {
   position: absolute;
   box-sizing: border-box;
 }
-.page-template-container #masonry-container .masonry-item:hover .masonry-image-shell {
-  box-shadow: var(--redefine-box-shadow);
-}
 .page-template-container #masonry-container .masonry-image-shell {
   position: relative;
   width: 100%;
@@ -6792,7 +6789,9 @@ html.is-animating .transition-fade-down {
 }
 .guestbook-history-container {
   width: 100%;
+  max-width: 860px;
   box-sizing: border-box;
+  margin: 0 auto;
   padding: 28px;
   border-radius: 10px;
   background: var(--background-color);
@@ -6816,28 +6815,41 @@ html.is-animating .transition-fade-down {
   gap: 16px;
 }
 .guestbook-history-item {
-  display: flex;
-  gap: 12px;
-  padding: 16px 0;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 0;
   border-top: 1px solid var(--border-color);
 }
 .guestbook-history-item.is-reply {
-  margin-top: 10px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  margin-top: 12px;
   padding: 12px;
   border: 1px solid var(--border-color);
   border-radius: 10px;
   background: var(--second-background-color);
+}
+.guestbook-history-item > .supabase-comment-avatar {
+  width: 42px;
+  height: 42px;
+  font-size: 0.95rem;
+}
+.guestbook-history-item.is-reply > .supabase-comment-avatar {
+  width: 34px;
+  height: 34px;
+  font-size: 0.82rem;
 }
 .guestbook-history-body {
   min-width: 0;
   flex: 1;
 }
 .guestbook-history-meta {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: baseline;
-  justify-content: space-between;
   gap: 12px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .guestbook-history-meta span {
   overflow: hidden;
@@ -6860,8 +6872,9 @@ html.is-animating .transition-fade-down {
 .guestbook-history-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-top: 10px;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
 }
 .guestbook-like-button,
 .guestbook-reply-toggle {
@@ -6891,6 +6904,9 @@ html.is-animating .transition-fade-down {
   font-size: 0.86rem;
 }
 .guestbook-replies {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   margin-top: 12px;
 }
 @media (max-width: 640px) {
@@ -6899,11 +6915,22 @@ html.is-animating .transition-fade-down {
     padding: 16px;
   }
   .guestbook-history-header,
-  .guestbook-history-meta,
   .guestbook-actions,
   .guestbook-reply-actions {
     align-items: flex-start;
     flex-direction: column;
+  }
+  .guestbook-history-item,
+  .guestbook-history-item.is-reply {
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 10px;
+  }
+  .guestbook-history-meta {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .guestbook-history-meta time {
+    white-space: normal;
   }
   .guestbook-history-new,
   .guestbook-submit,
@@ -6934,7 +6961,6 @@ html.is-animating .transition-fade-down {
 .home-comment-button,
 .blog-auth-button,
 .right-bottom-tools,
-.masonry-item,
 .page-template-container,
 .article-copyright-info-container,
 .navbar-item > a,
@@ -6954,7 +6980,6 @@ html.is-animating .transition-fade-down {
 .home-comment-button:hover,
 .blog-auth-button:hover,
 .right-bottom-tools:hover,
-.masonry-item:hover,
 .page-template-container:hover,
 .article-copyright-info-container:hover,
 .navbar-item > a:hover,
@@ -6969,7 +6994,6 @@ html.is-animating .transition-fade-down {
 .blog-comment-card:hover,
 .guestbook-history-container:hover,
 .guestbook-history-item:hover,
-.masonry-item:hover,
 .page-template-container:hover,
 .article-copyright-info-container:hover {
   box-shadow: var(--redefine-box-shadow-hover);
@@ -6986,7 +7010,6 @@ html.is-animating .transition-fade-down {
   .home-comment-button,
   .blog-auth-button,
   .right-bottom-tools,
-  .masonry-item,
   .page-template-container,
   .article-copyright-info-container,
   .navbar-item > a,
@@ -7004,7 +7027,6 @@ html.is-animating .transition-fade-down {
   .home-comment-button:hover,
   .blog-auth-button:hover,
   .right-bottom-tools:hover,
-  .masonry-item:hover,
   .page-template-container:hover,
   .article-copyright-info-container:hover,
   .navbar-item > a:hover,
