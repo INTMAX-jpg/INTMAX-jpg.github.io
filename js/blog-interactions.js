@@ -2,6 +2,8 @@ const interactionConfig = {
   repo: "INTMAX-jpg/INTMAX-jpg.github.io",
   likeStorageKey: "ZIXI_BLOG_LOCAL_LIKES",
   siteLikeStorageKey: "ZIXI_SITE_LIKE_COUNT",
+  siteLikeClientKey: "ZIXI_SITE_LIKE_CLIENT_ID",
+  siteLikesTable: "site_likes",
   commentsTable: "post_comments",
   siteCommentsTable: "site_comments",
   siteCommentLikesTable: "site_comment_likes",
@@ -616,6 +618,48 @@ function writeSiteLikeCount(count) {
   localStorage.setItem(interactionConfig.siteLikeStorageKey, String(Math.max(0, count)));
 }
 
+function getSiteLikeClientId() {
+  let clientId = localStorage.getItem(interactionConfig.siteLikeClientKey);
+  if (!clientId) {
+    clientId = window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem(interactionConfig.siteLikeClientKey, clientId);
+  }
+  return clientId;
+}
+
+async function fetchSiteLikeCount() {
+  const supabase = await getSupabaseClient();
+  const { count, error } = await supabase
+    .from(interactionConfig.siteLikesTable)
+    .select("id", { count: "exact", head: true })
+    .eq("site_key", "home");
+
+  if (error) throw error;
+  return count || 0;
+}
+
+async function syncHomeLikeCount() {
+  try {
+    const count = await fetchSiteLikeCount();
+    writeSiteLikeCount(count);
+    renderHomeLikeCount(count);
+  } catch (error) {
+    console.warn("Supabase site_likes is not ready; using local like count.", error);
+    renderHomeLikeCount();
+  }
+}
+
+async function persistHomeLike() {
+  const supabase = await getSupabaseClient();
+  const { error } = await supabase.from(interactionConfig.siteLikesTable).insert({
+    site_key: "home",
+    client_id: getSiteLikeClientId(),
+  });
+
+  if (error) throw error;
+  return fetchSiteLikeCount();
+}
+
 function fitHomeLikeCount(node, count) {
   const length = String(count).length;
   const size = Math.max(0.62, Math.min(1.5, 1.48 - Math.max(0, length - 2) * 0.12));
@@ -644,10 +688,10 @@ function createHomeLikeBurst(container) {
   }
 }
 
-function incrementHomeLikes(item) {
-  const count = readSiteLikeCount() + 1;
-  writeSiteLikeCount(count);
-  renderHomeLikeCount(count);
+async function incrementHomeLikes(item) {
+  const optimisticCount = readSiteLikeCount() + 1;
+  writeSiteLikeCount(optimisticCount);
+  renderHomeLikeCount(optimisticCount);
 
   const number = item.querySelector("[data-home-likes-count]");
   if (number) {
@@ -656,6 +700,14 @@ function incrementHomeLikes(item) {
     number.classList.add("is-popping");
     createHomeLikeBurst(number);
     window.setTimeout(() => number.classList.remove("is-popping"), 620);
+  }
+
+  try {
+    const persistedCount = await persistHomeLike();
+    writeSiteLikeCount(persistedCount);
+    renderHomeLikeCount(persistedCount);
+  } catch (error) {
+    console.warn("Failed to persist site like; kept local like count.", error);
   }
 }
 
@@ -697,6 +749,7 @@ function initHomeLikes() {
   });
 
   renderHomeLikeCount();
+  syncHomeLikeCount();
 }
 
 function getCurrentGuestbookUser() {
