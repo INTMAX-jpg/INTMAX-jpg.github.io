@@ -645,6 +645,7 @@ function incrementHomeLikes(item) {
     void number.offsetWidth;
     number.classList.add("is-popping");
     createHomeLikeBurst(number);
+    window.setTimeout(() => number.classList.remove("is-popping"), 620);
   }
 }
 
@@ -653,8 +654,9 @@ function initHomeLikes() {
 
   document.querySelectorAll('.statistics a[href="/tags"], .statistics .home-likes-stat').forEach((item) => {
     item.classList.add("home-likes-stat");
-    item.setAttribute("href", "#");
+    item.removeAttribute("href");
     item.setAttribute("role", "button");
+    item.setAttribute("tabindex", "0");
     item.setAttribute("aria-label", "Like this blog");
 
     const number = item.querySelector(".number");
@@ -672,6 +674,7 @@ function initHomeLikes() {
       item.dataset.homeLikesBound = "true";
       item.addEventListener("click", (event) => {
         event.preventDefault();
+        if (!event.target.closest("[data-home-likes-count]")) return;
         incrementHomeLikes(item);
       });
       item.addEventListener("keydown", (event) => {

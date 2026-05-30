@@ -6607,10 +6607,6 @@ html.is-animating .transition-fade-down {
 .home-likes-stat .home-like-heart-icon {
   transition: color 0.18s ease, opacity 0.18s ease, transform 0.22s ease;
 }
-.home-likes-stat:hover .label,
-.home-likes-stat:focus-visible .label {
-  color: var(--primary-color);
-}
 .home-like-count {
   position: relative;
   display: grid;
@@ -6621,6 +6617,7 @@ html.is-animating .transition-fade-down {
   min-width: 0;
   line-height: 1;
   overflow: visible;
+  cursor: pointer;
 }
 .home-like-value {
   display: block;
@@ -6641,12 +6638,13 @@ html.is-animating .transition-fade-down {
   opacity: 0;
   transform: scale(0.58);
 }
-.home-likes-stat:hover .home-like-value,
-.home-likes-stat:focus-visible .home-like-value {
+.home-like-count:hover .home-like-value,
+.home-likes-stat:focus-visible .home-like-value,
+.home-like-count.is-popping .home-like-value {
   opacity: 0;
   transform: translateY(2px) scale(0.84);
 }
-.home-likes-stat:hover .home-like-heart-icon,
+.home-like-count:hover .home-like-heart-icon,
 .home-likes-stat:focus-visible .home-like-heart-icon {
   opacity: 1;
   transform: scale(1.05);
