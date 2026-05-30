@@ -531,17 +531,27 @@ async function submitSupabaseComment(context) {
 const homeHeroQuotes = [
   {
     title: "Stay Hungry, Stay Foolish.",
-    subtitle: "求知若渴，虚心若愚",
+    subtitle: "\u6c42\u77e5\u82e5\u6e34\uff0c\u865a\u5fc3\u82e5\u611a",
+    typedSubtitle: "\u6c42\u77e5\u82e5\u6e34^480\uff0c^260\u865a\u5fc3\u82e5\u611a",
   },
   {
     title: "Life happens for you, not to you.",
-    subtitle: "万事发生皆有利于我",
+    subtitle: "\u4e07\u4e8b\u53d1\u751f\u7686\u6709\u5229\u4e8e\u6211",
+    typedSubtitle: "\u4e07\u4e8b\u53d1\u751f^420\u7686\u6709\u5229\u4e8e\u6211",
   },
   {
     title: "Ready, fire, aim.",
-    subtitle: "先开枪，再瞄准",
+    subtitle: "\u5148\u5f00\u67aa\uff0c\u518d\u7784\u51c6",
+    typedSubtitle: "\u5148\u5f00\u67aa^520\uff0c^300\u518d\u7784\u51c6",
   },
 ];
+
+const homeHeroTyping = {
+  typeSpeed: 155,
+  backSpeed: 52,
+  backDelay: 2300,
+  startDelay: 850,
+};
 
 function applyHomeHeroQuote(quote) {
   const description = document.querySelector(".home-banner-container .description");
@@ -568,13 +578,13 @@ function applyHomeHeroQuote(quote) {
 
   if (window.Typed) {
     new Typed("#subtitle", {
-      strings: [quote.subtitle],
-      typeSpeed: window.theme?.home_banner?.subtitle?.typing_speed || 100,
+      strings: [quote.typedSubtitle || quote.subtitle],
+      typeSpeed: homeHeroTyping.typeSpeed,
       smartBackspace: window.theme?.home_banner?.subtitle?.smart_backspace || false,
-      backSpeed: window.theme?.home_banner?.subtitle?.backing_speed || 80,
-      backDelay: window.theme?.home_banner?.subtitle?.backing_delay || 1500,
+      backSpeed: homeHeroTyping.backSpeed,
+      backDelay: homeHeroTyping.backDelay,
       loop: window.theme?.home_banner?.subtitle?.loop || false,
-      startDelay: window.theme?.home_banner?.subtitle?.starting_delay || 500,
+      startDelay: homeHeroTyping.startDelay,
     });
   } else {
     stableSubtitle.textContent = quote.subtitle;

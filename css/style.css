@@ -249,7 +249,7 @@
   --note-type-title-bg: #4e3a1e;
   --note-black-title-bg: #1e1e1e;
   --note-purple-title-bg: #4e1e4e;
-  --home-banner-text-color: #d1d1b6;
+  --home-banner-text-color: rgba(236, 236, 216, 0.96);
   --home-banner-icons-container-border-color: rgba(197,197,197,0.35);
   --home-banner-icons-container-background-color: rgba(197,197,197,0.3);
   --redefine-box-shadow: var(--shadow-color-2) 0px 6px 24px 0px, var(--shadow-color-1) 0px 0px 0px 1px;
@@ -1530,6 +1530,12 @@ pre .deletion {
 }
 .home-banner-container .content .description p span {
   font-size: 1.575rem;
+}
+html.dark .home-banner-container .content .description,
+html[data-theme="dark"] .home-banner-container .content .description,
+:root[data-theme="dark"] .home-banner-container .content .description {
+  color: rgba(236, 236, 216, 0.96);
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.38);
 }
 @media (max-width: 768px) {
   .home-banner-container .content .description {
