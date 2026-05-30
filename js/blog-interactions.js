@@ -2,6 +2,8 @@ const interactionConfig = {
   repo: "INTMAX-jpg/INTMAX-jpg.github.io",
   likeStorageKey: "ZIXI_BLOG_LOCAL_LIKES",
   commentsTable: "post_comments",
+  siteCommentsTable: "site_comments",
+  siteCommentLikesTable: "site_comment_likes",
 };
 
 const authConfig = {
@@ -173,6 +175,7 @@ async function initAuth() {
         currentSession = session;
         updateAuthUI(session);
         if (activePostContext) renderCommentArea(activePostContext, true);
+        initSiteGuestbook(true);
       });
     }
   } catch (error) {
@@ -521,8 +524,404 @@ async function submitSupabaseComment(context) {
   }
 }
 
+
+const guestbookEmojis = ["✨", "👏", "📷", "💡", "🌿", "🔥", "😊", "🚀", "☕", "🎧"];
+
+function isHomePage() {
+  return window.location.pathname === "/" || window.location.pathname === "/index.html";
+}
+
+function isCommentsPage() {
+  return window.location.pathname.replace(/\/index\.html$/, "/") === "/comments/";
+}
+
+function getCurrentGuestbookUser() {
+  const user = currentSession?.user || null;
+  if (!user) return null;
+
+  return {
+    id: user.id,
+    name: getUserDisplayName(user),
+    avatar: getUserAvatar(user),
+  };
+}
+
+async function fetchSiteCommentCount() {
+  try {
+    const supabase = await getSupabaseClient();
+    const { count, error } = await supabase
+      .from(interactionConfig.siteCommentsTable)
+      .select("id", { count: "exact", head: true });
+
+    if (error) throw error;
+    return count || 0;
+  } catch (error) {
+    console.warn("留言数量加载失败", error);
+    return 0;
+  }
+}
+
+async function updateSiteCommentCount() {
+  const countNodes = document.querySelectorAll("[data-site-comments-count]");
+  if (!countNodes.length) return;
+
+  const count = await fetchSiteCommentCount();
+  countNodes.forEach((node) => {
+    node.textContent = String(count);
+  });
+}
+
+function initHomeGuestbook() {
+  if (!isHomePage()) return;
+
+  document.querySelectorAll('.statistics a[href="/categories"]').forEach((item) => {
+    item.setAttribute("href", "/comments/");
+    item.classList.add("site-comments-stat");
+    const number = item.querySelector(".number");
+    const label = item.querySelector(".label");
+    if (number) number.setAttribute("data-site-comments-count", "true");
+    if (label) label.textContent = "Comments";
+  });
+
+  document.querySelectorAll(".home-sidebar-container .sidebar-content").forEach((sidebar) => {
+    if (sidebar.querySelector(".home-comment-button")) return;
+
+    const button = document.createElement("button");
+    button.className = "home-comment-button";
+    button.type = "button";
+    button.innerHTML = '<i class="fa-regular fa-message"></i><span>Comment</span>';
+    button.addEventListener("click", openGuestbookModal);
+    sidebar.appendChild(button);
+  });
+
+  ensureGuestbookModal();
+  updateSiteCommentCount();
+}
+
+function ensureGuestbookModal() {
+  if (document.querySelector(".guestbook-modal")) return;
+
+  const modal = document.createElement("div");
+  modal.className = "guestbook-modal";
+  modal.hidden = true;
+  modal.innerHTML = `
+    <div class="guestbook-modal-backdrop" data-guestbook-close></div>
+    <section class="guestbook-dialog" role="dialog" aria-modal="true" aria-labelledby="guestbook-title">
+      <button class="guestbook-close" type="button" data-guestbook-close aria-label="关闭留言框">
+        <i class="fa-regular fa-xmark"></i>
+      </button>
+      <div class="blog-comment-eyebrow">Guestbook</div>
+      <h2 id="guestbook-title">给 Zixi 留言</h2>
+      <p class="guestbook-description">留下你对博客、照片或文章的评价。登录状态会使用顶部 GitHub 账号。</p>
+      <div class="guestbook-user-line"></div>
+      <textarea class="guestbook-input" maxlength="800" rows="5" placeholder="写点什么..."></textarea>
+      <div class="guestbook-emoji-row">
+        ${guestbookEmojis.map((emoji) => `<button type="button" data-emoji="${emoji}">${emoji}</button>`).join("")}
+      </div>
+      <div class="guestbook-actions">
+        <span class="guestbook-status" role="status"></span>
+        <button class="post-action-button guestbook-submit" type="button">
+          <i class="fa-regular fa-paper-plane"></i>
+          <span>发送</span>
+        </button>
+      </div>
+    </section>
+  `;
+
+  document.body.appendChild(modal);
+  modal.querySelectorAll("[data-guestbook-close]").forEach((element) => {
+    element.addEventListener("click", closeGuestbookModal);
+  });
+  modal.querySelectorAll("[data-emoji]").forEach((button) => {
+    button.addEventListener("click", () => appendEmojiToGuestbook(button.dataset.emoji));
+  });
+  modal.querySelector(".guestbook-submit").addEventListener("click", () => submitSiteComment(null));
+}
+
+function openGuestbookModal() {
+  const modal = document.querySelector(".guestbook-modal");
+  if (!modal) return;
+
+  renderGuestbookModalUser();
+  modal.hidden = false;
+  document.body.classList.add("guestbook-modal-open");
+  requestAnimationFrame(() => modal.querySelector(".guestbook-input")?.focus());
+}
+
+function closeGuestbookModal() {
+  const modal = document.querySelector(".guestbook-modal");
+  if (!modal) return;
+
+  modal.hidden = true;
+  document.body.classList.remove("guestbook-modal-open");
+}
+
+function renderGuestbookModalUser() {
+  const line = document.querySelector(".guestbook-user-line");
+  if (!line) return;
+
+  const user = getCurrentGuestbookUser();
+  if (!user) {
+    line.innerHTML = `
+      <span>需要先登录 GitHub 才能发送留言。</span>
+      <button class="blog-comment-open" type="button">GitHub 登录</button>
+    `;
+    line.querySelector("button").addEventListener("click", signInWithGitHub);
+    return;
+  }
+
+  line.innerHTML = `
+    ${renderUserAvatar(user.name, user.avatar)}
+    <span>${escapeHTML(user.name)}</span>
+  `;
+}
+
+function appendEmojiToGuestbook(emoji) {
+  const input = document.querySelector(".guestbook-input");
+  if (!input) return;
+
+  const start = input.selectionStart || input.value.length;
+  const end = input.selectionEnd || input.value.length;
+  input.value = `${input.value.slice(0, start)}${emoji}${input.value.slice(end)}`;
+  input.focus();
+  input.selectionStart = input.selectionEnd = start + emoji.length;
+}
+
+async function submitSiteComment(parentId) {
+  const user = getCurrentGuestbookUser();
+  const input = parentId
+    ? document.querySelector(`[data-reply-input="${parentId}"]`)
+    : document.querySelector(".guestbook-input");
+  const status = parentId
+    ? document.querySelector(`[data-reply-status="${parentId}"]`)
+    : document.querySelector(".guestbook-status");
+
+  if (!user) {
+    if (status) status.textContent = "请先登录 GitHub。";
+    await signInWithGitHub();
+    return;
+  }
+
+  const body = input?.value.trim() || "";
+  if (!body) {
+    if (status) status.textContent = "请先输入内容。";
+    return;
+  }
+
+  if (body.length > 800) {
+    if (status) status.textContent = "留言不能超过 800 字。";
+    return;
+  }
+
+  if (status) status.textContent = "正在发送...";
+
+  try {
+    const supabase = await getSupabaseClient();
+    const { error } = await supabase.from(interactionConfig.siteCommentsTable).insert({
+      parent_id: parentId,
+      body,
+      user_id: user.id,
+      user_name: user.name,
+      user_avatar: user.avatar,
+    });
+
+    if (error) throw error;
+
+    if (input) input.value = "";
+    if (status) status.textContent = parentId ? "回复已发布。" : "留言已发送。";
+    await updateSiteCommentCount();
+    if (isCommentsPage()) await renderGuestbookHistory();
+    if (!parentId) setTimeout(closeGuestbookModal, 450);
+  } catch (error) {
+    console.warn("留言发送失败", error);
+    if (status) status.textContent = "发送失败。请确认已在 Supabase 执行 supabase/site_comments.sql。";
+  }
+}
+
+async function fetchSiteComments() {
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase
+    .from(interactionConfig.siteCommentsTable)
+    .select("id, parent_id, body, user_id, user_name, user_avatar, created_at")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+async function fetchSiteCommentLikes() {
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase
+    .from(interactionConfig.siteCommentLikesTable)
+    .select("comment_id, user_id");
+
+  if (error) throw error;
+  return data || [];
+}
+
+function groupSiteComments(comments) {
+  const roots = [];
+  const replies = new Map();
+
+  comments.forEach((comment) => {
+    if (comment.parent_id) {
+      const list = replies.get(comment.parent_id) || [];
+      list.push(comment);
+      replies.set(comment.parent_id, list);
+    } else {
+      roots.push(comment);
+    }
+  });
+
+  return { roots, replies };
+}
+
+function buildLikeSummary(likes) {
+  const counts = new Map();
+  const likedByMe = new Set();
+  const userId = currentSession?.user?.id;
+
+  likes.forEach((like) => {
+    counts.set(like.comment_id, (counts.get(like.comment_id) || 0) + 1);
+    if (userId && like.user_id === userId) likedByMe.add(like.comment_id);
+  });
+
+  return { counts, likedByMe };
+}
+
+function renderSiteComment(comment, replies, likeSummary, isReply = false) {
+  const count = likeSummary.counts.get(comment.id) || 0;
+  const liked = likeSummary.likedByMe.has(comment.id);
+  const replyList = replies.get(comment.id) || [];
+
+  return `
+    <article class="guestbook-history-item ${isReply ? "is-reply" : ""}">
+      ${renderUserAvatar(comment.user_name, comment.user_avatar)}
+      <div class="guestbook-history-body">
+        <div class="guestbook-history-meta">
+          <span>${escapeHTML(comment.user_name || "GitHub User")}</span>
+          <time>${escapeHTML(formatCommentTime(comment.created_at))}</time>
+        </div>
+        <p>${escapeHTML(comment.body).replace(/\n/g, "<br>")}</p>
+        <div class="guestbook-history-actions">
+          <button type="button" data-comment-like="${comment.id}" class="guestbook-like-button ${liked ? "is-liked" : ""}">
+            <i class="fa-${liked ? "solid" : "regular"} fa-heart"></i>
+            <span>${count}</span>
+          </button>
+          ${isReply ? "" : `<button type="button" data-reply-toggle="${comment.id}" class="guestbook-reply-toggle">回复</button>`}
+        </div>
+        ${isReply ? "" : `
+          <div class="guestbook-reply-box" data-reply-box="${comment.id}" hidden>
+            <textarea data-reply-input="${comment.id}" maxlength="800" rows="3" placeholder="回复 ${escapeHTML(comment.user_name || "TA")}..."></textarea>
+            <div class="guestbook-reply-actions">
+              <span data-reply-status="${comment.id}"></span>
+              <button type="button" class="post-action-button" data-reply-submit="${comment.id}">发送回复</button>
+            </div>
+          </div>
+          <div class="guestbook-replies">
+            ${replyList.slice().reverse().map((reply) => renderSiteComment(reply, replies, likeSummary, true)).join("")}
+          </div>
+        `}
+      </div>
+    </article>
+  `;
+}
+
+async function renderGuestbookHistory() {
+  const root = document.querySelector("#guestbook-history-root");
+  if (!root) return;
+
+  root.innerHTML = '<div class="guestbook-history-status">正在加载留言...</div>';
+
+  try {
+    const [comments, likes] = await Promise.all([fetchSiteComments(), fetchSiteCommentLikes()]);
+    const { roots, replies } = groupSiteComments(comments);
+    const likeSummary = buildLikeSummary(likes);
+
+    root.innerHTML = `
+      <div class="guestbook-history-header">
+        <div>
+          <div class="blog-comment-eyebrow">Comments</div>
+          <h2>历史留言</h2>
+        </div>
+        <button class="post-action-button guestbook-history-new" type="button">
+          <i class="fa-regular fa-message"></i>
+          <span>写留言</span>
+        </button>
+      </div>
+      <div class="guestbook-history-list">
+        ${roots.length ? roots.map((comment) => renderSiteComment(comment, replies, likeSummary)).join("") : '<div class="guestbook-history-empty">还没有留言，欢迎留下第一条。</div>'}
+      </div>
+    `;
+
+    root.querySelector(".guestbook-history-new")?.addEventListener("click", openGuestbookModal);
+    root.querySelectorAll("[data-reply-toggle]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const box = root.querySelector(`[data-reply-box="${button.dataset.replyToggle}"]`);
+        if (box) box.hidden = !box.hidden;
+      });
+    });
+    root.querySelectorAll("[data-reply-submit]").forEach((button) => {
+      button.addEventListener("click", () => submitSiteComment(button.dataset.replySubmit));
+    });
+    root.querySelectorAll("[data-comment-like]").forEach((button) => {
+      button.addEventListener("click", () => toggleSiteCommentLike(button.dataset.commentLike));
+    });
+  } catch (error) {
+    console.warn("历史留言加载失败", error);
+    root.innerHTML = '<div class="guestbook-history-status">留言表还没有配置，或当前 RLS 策略不允许读取。请先在 Supabase 执行 supabase/site_comments.sql。</div>';
+  }
+}
+
+async function toggleSiteCommentLike(commentId) {
+  const user = getCurrentGuestbookUser();
+  if (!user) {
+    await signInWithGitHub();
+    return;
+  }
+
+  try {
+    const supabase = await getSupabaseClient();
+    const { data, error } = await supabase
+      .from(interactionConfig.siteCommentLikesTable)
+      .select("id")
+      .eq("comment_id", commentId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (data) {
+      const { error: deleteError } = await supabase
+        .from(interactionConfig.siteCommentLikesTable)
+        .delete()
+        .eq("id", data.id);
+      if (deleteError) throw deleteError;
+    } else {
+      const { error: insertError } = await supabase
+        .from(interactionConfig.siteCommentLikesTable)
+        .insert({ comment_id: commentId, user_id: user.id });
+      if (insertError) throw insertError;
+    }
+
+    await renderGuestbookHistory();
+  } catch (error) {
+    console.warn("留言点赞失败", error);
+  }
+}
+
+function initSiteGuestbook(force = false) {
+  initHomeGuestbook();
+  ensureGuestbookModal();
+  renderGuestbookModalUser();
+
+  if (isCommentsPage()) {
+    renderGuestbookHistory();
+  }
+}
 function initBlogInteractions() {
   initAuth();
+  initSiteGuestbook();
   const context = getPostContext();
   if (!context) return;
 
