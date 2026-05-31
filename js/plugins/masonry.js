@@ -17,7 +17,7 @@ export function initMasonry() {
       startProgressiveImageLoading();
     })
     .catch(function () {
-      renderGalleryMessage("Photo loading failed. Please check images/gallery/.");
+      renderGalleryMessage("Photo loading failed. Please check images/gallery_compress/.");
       revealMasonryContainer();
     });
 
@@ -34,7 +34,7 @@ export function initMasonry() {
 
     return getGalleryFiles().then(function (files) {
       if (!files.length) {
-        renderGalleryMessage("No photos yet. Put your images in images/gallery/.");
+        renderGalleryMessage("No photos yet. Put your images in images/gallery_compress/.");
         return;
       }
 
@@ -96,23 +96,21 @@ export function initMasonry() {
   }
 
   function getGalleryFiles() {
-    var repoApi =
-      "https://api.github.com/repos/INTMAX-jpg/INTMAX-jpg.github.io/contents/images/gallery";
-    return fetch(repoApi, { cache: "no-store" })
+    return fetch("/images/gallery_compress/photos.json", { cache: "no-store" })
       .then(function (response) {
-        if (!response.ok) throw new Error("No GitHub gallery directory");
+        if (!response.ok) throw new Error("No local gallery manifest");
         return response.json();
       })
-      .then(function (items) {
-        return normalizeGithubFiles(items);
-      })
+      .then(normalizeManifestFiles)
       .catch(function () {
-        return fetch("/images/gallery/photos.json", { cache: "no-store" })
+        var repoApi =
+          "https://api.github.com/repos/INTMAX-jpg/INTMAX-jpg.github.io/contents/images/gallery_compress";
+        return fetch(repoApi, { cache: "no-store" })
           .then(function (response) {
-            if (!response.ok) return [];
+            if (!response.ok) throw new Error("No GitHub gallery_compress directory");
             return response.json();
           })
-          .then(normalizeManifestFiles)
+          .then(normalizeGithubFiles)
           .catch(function () {
             return [];
           });
@@ -128,7 +126,7 @@ export function initMasonry() {
       .map(function (item) {
         return {
           name: item.name,
-          url: "/images/gallery/" + encodeURIComponent(item.name),
+          url: "/images/gallery_compress/" + encodeURIComponent(item.name),
         };
       });
   }
@@ -140,7 +138,7 @@ export function initMasonry() {
         if (typeof file === "string") {
           return {
             name: file,
-            url: "/images/gallery/" + encodeURIComponent(file),
+            url: "/images/gallery_compress/" + encodeURIComponent(file),
           };
         }
 
