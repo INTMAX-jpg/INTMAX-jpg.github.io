@@ -7069,3 +7069,23 @@ html.is-animating .transition-fade-down {
   color: var(--third-text-color);
   font-size: 0.92rem;
 }
+
+/* Keep gallery items static; only loading placeholders may animate. */
+.page-template-container:has(#masonry-container),
+.page-template-container:has(#masonry-container):hover,
+.page-template-container #masonry-container .masonry-item,
+.page-template-container #masonry-container .masonry-item:hover,
+.page-template-container #masonry-container .masonry-image-shell,
+.page-template-container #masonry-container .masonry-item:hover .masonry-image-shell,
+.page-template-container #masonry-container .masonry-item img,
+.page-template-container #masonry-container .masonry-item:hover img {
+  animation: none !important;
+  transform: none !important;
+  filter: none !important;
+}
+.page-template-container:has(#masonry-container):hover {
+  box-shadow: var(--redefine-box-shadow);
+}
+.page-template-container #masonry-container .masonry-item:hover .masonry-image-shell {
+  box-shadow: var(--redefine-box-shadow-flat);
+}
