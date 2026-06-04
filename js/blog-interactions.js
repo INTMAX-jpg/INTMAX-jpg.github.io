@@ -19,7 +19,80 @@ let currentSession = null;
 let authInitialized = false;
 let authListenerInitialized = false;
 let activePostContext = null;
+let galleryPreloadStarted = false;
 
+function isGalleryPage() {
+  return window.location.pathname.startsWith("/masonry");
+}
+
+function canPreloadGallery() {
+  const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (!connection) return true;
+  return !connection.saveData && !String(connection.effectiveType || "").endsWith("2g");
+}
+
+function normalizeGalleryPreloadFiles(files) {
+  if (!Array.isArray(files)) return [];
+  return files
+    .map((file) => {
+      if (typeof file === "string") {
+        return `/images/gallery_compress/${encodeURIComponent(file)}`;
+      }
+      return file?.url || null;
+    })
+    .filter(Boolean);
+}
+
+async function preloadGalleryImage(url) {
+  try {
+    const response = await fetch(url, { cache: "force-cache", priority: "low" });
+    if (!response.ok) return;
+    await response.blob();
+  } catch (error) {}
+}
+
+async function runGalleryPreloadQueue(urls) {
+  const queue = urls.slice();
+  const worker = async () => {
+    while (queue.length && canPreloadGallery()) {
+      await preloadGalleryImage(queue.shift());
+    }
+  };
+
+  await Promise.all([worker(), worker()]);
+}
+
+async function startGalleryPreload() {
+  if (galleryPreloadStarted || isGalleryPage() || !canPreloadGallery()) return;
+  galleryPreloadStarted = true;
+
+  try {
+    const response = await fetch("/images/gallery_compress/photos.json", {
+      cache: "force-cache",
+      priority: "low",
+    });
+    if (!response.ok) return;
+    const urls = normalizeGalleryPreloadFiles(await response.json());
+    await runGalleryPreloadQueue(urls);
+  } catch (error) {}
+}
+
+function scheduleGalleryPreload() {
+  if (galleryPreloadStarted || isGalleryPage() || !canPreloadGallery()) return;
+  const begin = () => {
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(startGalleryPreload, { timeout: 2500 });
+    } else {
+      window.setTimeout(startGalleryPreload, 1200);
+    }
+  };
+
+  if (document.readyState === "complete") {
+    begin();
+  } else {
+    window.addEventListener("load", begin, { once: true });
+  }
+}
 function getSupabaseClient() {
   if (!supabaseClientPromise) {
     supabaseClientPromise = import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm")
@@ -1144,6 +1217,7 @@ function initSiteGuestbook(force = false) {
   }
 }
 function initBlogInteractions() {
+  scheduleGalleryPreload();
   randomizeHomeHeroQuote();
   initAuth();
   initSiteGuestbook();
