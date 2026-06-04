@@ -546,6 +546,11 @@ const homeHeroQuotes = [
     subtitle: "\u5148\u5f00\u67aa\uff0c\u518d\u7784\u51c6",
     typedSubtitle: "\u5148\u5f00\u67aa^520\uff0c^300\u518d\u7784\u51c6",
   },
+  {
+    title: "Don't ask for permission, ask for forgiveness",
+    subtitle: "\u884c\u52a8\u679c\u65ad\uff0c\u51fa\u4e8b\u62c5\u8d23",
+    typedSubtitle: "\u884c\u52a8\u679c\u65ad^420\uff0c\u51fa\u4e8b\u62c5\u8d23",
+  },
 ];
 
 const homeHeroTyping = {
