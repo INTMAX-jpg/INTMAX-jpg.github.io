@@ -6,6 +6,12 @@ export function initMasonry() {
   var masonry = null;
   var layoutTimer = null;
   var eagerCount = 3;
+  var maxConcurrentLoads = 3;
+  var loadingQueue = [];
+  var activeLoads = 0;
+  var loadProgress = null;
+  var progressHideTimer = null;
+  var progressUpdateTimer = null;
 
   loadingPlaceholder.style.display = "block";
   masonryContainer.style.display = "none";
@@ -38,6 +44,8 @@ export function initMasonry() {
         return;
       }
 
+      initializeLoadProgress(files);
+
       var fragment = document.createDocumentFragment();
       files.forEach(function (file, index) {
         fragment.appendChild(createGalleryItem(file, index));
@@ -61,6 +69,7 @@ export function initMasonry() {
     img.decoding = "async";
     img.loading = index < eagerCount ? "eager" : "lazy";
     img.dataset.src = file.url;
+    img.dataset.size = file.size || 0;
     if (index < 2) {
       img.fetchPriority = "high";
     }
@@ -75,6 +84,7 @@ export function initMasonry() {
       item.classList.remove("masonry-item-loading");
       item.classList.add("masonry-item-loaded");
       shell.classList.remove("loading");
+      settleImageLoad(img, true);
       scheduleLayout();
     });
 
@@ -82,6 +92,7 @@ export function initMasonry() {
       item.classList.remove("masonry-item-loading");
       item.classList.add("masonry-item-error");
       shell.classList.remove("loading");
+      settleImageLoad(img, false);
       scheduleLayout();
     });
 
@@ -127,6 +138,7 @@ export function initMasonry() {
         return {
           name: item.name,
           url: "/images/gallery_compress/" + encodeURIComponent(item.name),
+          size: Number(item.size) || 0,
         };
       });
   }
@@ -139,11 +151,16 @@ export function initMasonry() {
           return {
             name: file,
             url: "/images/gallery_compress/" + encodeURIComponent(file),
+            size: 0,
           };
         }
 
         if (file && file.name && file.url) {
-          return file;
+          return {
+            name: file.name,
+            url: file.url,
+            size: Number(file.size) || 0,
+          };
         }
 
         return null;
@@ -186,37 +203,161 @@ export function initMasonry() {
   }
 
   function startProgressiveImageLoading() {
-    var images = Array.prototype.slice.call(
+    loadingQueue = Array.prototype.slice.call(
       masonryContainer.querySelectorAll(".masonry-item img[data-src]"),
     );
-
-    images.slice(0, eagerCount).forEach(loadImage);
-
-    if (!("IntersectionObserver" in window)) {
-      images.slice(eagerCount).forEach(loadImage);
-      return;
-    }
-
-    var observer = new IntersectionObserver(
-      function (entries) {
-        entries.forEach(function (entry) {
-          if (!entry.isIntersecting) return;
-          observer.unobserve(entry.target);
-          var img = entry.target.querySelector("img[data-src]");
-          if (img) loadImage(img);
-        });
-      },
-      { rootMargin: "900px 0px" },
-    );
-
-    images.slice(eagerCount).forEach(function (img) {
-      observer.observe(img.closest(".masonry-item"));
-    });
+    activeLoads = 0;
+    pumpLoadingQueue();
   }
 
   function loadImage(img) {
     if (!img || img.src) return;
+    img.loading = "eager";
+    img.dataset.loadStartedAt = performance.now();
     img.src = img.dataset.src;
+  }
+
+  function pumpLoadingQueue() {
+    while (activeLoads < maxConcurrentLoads && loadingQueue.length) {
+      var nextImage = loadingQueue.shift();
+      if (!nextImage || nextImage.src || nextImage.dataset.loadSettled === "true") {
+        continue;
+      }
+      activeLoads += 1;
+      loadImage(nextImage);
+    }
+  }
+
+  function initializeLoadProgress(files) {
+    var status = getLoadStatusElement();
+    clearTimeout(progressHideTimer);
+    clearInterval(progressUpdateTimer);
+    loadProgress = {
+      status: status,
+      total: files.length,
+      completed: 0,
+      failed: 0,
+      completedBytes: 0,
+      knownTotalBytes: files.reduce(function (total, file) {
+        return total + (Number(file.size) || 0);
+      }, 0),
+      knownFileCount: files.filter(function (file) {
+        return Number(file.size) > 0;
+      }).length,
+      startedAt: performance.now(),
+    };
+    status.hidden = false;
+    status.classList.remove("complete");
+    updateLoadStatus();
+    progressUpdateTimer = setInterval(updateLoadStatus, 1000);
+  }
+
+  function getLoadStatusElement() {
+    var status = document.querySelector(".gallery-load-status");
+    if (status) return status;
+
+    status = document.createElement("p");
+    status.className = "gallery-load-status";
+    status.setAttribute("role", "status");
+    status.setAttribute("aria-live", "polite");
+    loadingPlaceholder.insertAdjacentElement("afterend", status);
+    return status;
+  }
+
+  function settleImageLoad(img, loaded) {
+    if (!loadProgress || img.dataset.loadSettled === "true") return;
+    img.dataset.loadSettled = "true";
+    activeLoads = Math.max(0, activeLoads - 1);
+    loadProgress.completed += 1;
+    if (!loaded) loadProgress.failed += 1;
+    loadProgress.completedBytes += getImageSize(img);
+    updateLoadStatus();
+    pumpLoadingQueue();
+  }
+
+  function getImageSize(img) {
+    var declaredSize = Number(img.dataset.size) || 0;
+    if (declaredSize) return declaredSize;
+
+    if (!performance.getEntriesByName) return 0;
+    var entries = performance.getEntriesByName(img.currentSrc || img.src);
+    var entry = entries[entries.length - 1];
+    return entry ? entry.encodedBodySize || entry.transferSize || 0 : 0;
+  }
+
+  function updateLoadStatus() {
+    if (!loadProgress) return;
+    var progress = loadProgress;
+    if (!progress.status.isConnected) {
+      clearInterval(progressUpdateTimer);
+      return;
+    }
+    var remainingCount = progress.total - progress.completed;
+
+    if (remainingCount <= 0) {
+      progress.status.textContent =
+        "相册已加载完成，共 " +
+        progress.total +
+        " 张照片" +
+        (progress.failed ? "，" + progress.failed + " 张加载失败" : "");
+      progress.status.classList.add("complete");
+      clearInterval(progressUpdateTimer);
+      progressHideTimer = setTimeout(function () {
+        progress.status.hidden = true;
+      }, 2400);
+      return;
+    }
+
+    if (progress.completed < 2 || !progress.completedBytes) {
+      progress.status.textContent =
+        "正在检测当前网速，已加载 " +
+        progress.completed +
+        "/" +
+        progress.total +
+        " 张照片…";
+      return;
+    }
+
+    var elapsedSeconds = Math.max(
+      (performance.now() - progress.startedAt) / 1000,
+      1,
+    );
+    var averageKnownSize = progress.knownFileCount
+      ? progress.knownTotalBytes / progress.knownFileCount
+      : progress.completedBytes / progress.completed;
+    var estimatedTotalBytes = progress.knownTotalBytes
+      ? progress.knownTotalBytes +
+        averageKnownSize * (progress.total - progress.knownFileCount)
+      : averageKnownSize * progress.total;
+    var bytesPerSecond = progress.completedBytes / elapsedSeconds;
+    var remainingBytes = Math.max(
+      estimatedTotalBytes - progress.completedBytes,
+      0,
+    );
+    var remainingSeconds = bytesPerSecond
+      ? Math.ceil(remainingBytes / bytesPerSecond)
+      : 0;
+    var prefix =
+      remainingSeconds >= 60 || bytesPerSecond < 1.5 * 1024 * 1024
+        ? "当前网速较慢，"
+        : "相册正在加载，";
+
+    progress.status.textContent =
+      prefix +
+      "预计完成加载还需要约 " +
+      formatRemainingTime(remainingSeconds) +
+      "（" +
+      progress.completed +
+      "/" +
+      progress.total +
+      "）";
+  }
+
+  function formatRemainingTime(seconds) {
+    if (!seconds || seconds < 10) return "几秒";
+    if (seconds < 60) return seconds + " 秒";
+    if (seconds < 3600) return Math.ceil(seconds / 60) + " 分钟";
+    return Math.ceil(seconds / 3600) + " 小时";
   }
 
   function scheduleLayout() {

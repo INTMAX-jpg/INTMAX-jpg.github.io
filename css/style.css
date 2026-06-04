@@ -2190,6 +2190,41 @@ html.is-animating .transition-navbar {
   opacity: 1;
   transition: opacity 0.1s ease-out;
 }
+.page-template-container .gallery-load-status {
+  margin: 0 0 18px;
+  color: var(--third-text-color);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  text-align: center;
+  text-wrap: pretty;
+  transition: opacity 0.2s ease;
+}
+.page-template-container .gallery-load-status::before {
+  content: "";
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  margin-right: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  vertical-align: 0.02rem;
+  animation: gallery-status-spin 0.9s linear infinite;
+}
+.page-template-container .gallery-load-status.complete::before {
+  border-color: var(--primary-color);
+  animation: none;
+}
+@keyframes gallery-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-template-container .gallery-load-status::before {
+    animation: none;
+  }
+}
 .page-template-container .loading {
   -webkit-animation: gradient-slide 1.1s ease infinite;
   animation: gradient-slide 1.1s ease infinite;
