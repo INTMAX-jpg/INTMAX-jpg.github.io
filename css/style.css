@@ -2203,16 +2203,19 @@ html.is-animating .transition-navbar {
   -webkit-backdrop-filter: blur(12px) saturate(1.18);
   cursor: pointer;
   opacity: 0;
-  transform: translateY(5px) scale(0.96);
-  transition: opacity 0.22s ease, transform 0.22s ease, color 0.18s ease, background 0.18s ease, border-color 0.18s ease;
-}
-.page-template-container #masonry-container .masonry-item-loaded .gallery-photo-like,
-.page-template-container #masonry-container .gallery-photo-like:focus-visible {
-  opacity: 1;
-  transform: translateY(0) scale(1);
+  transform: translate(9px, 9px) scale(0.68);
+  transition: opacity 0.22s ease, transform 0.24s cubic-bezier(0.2, 0.82, 0.22, 1), color 0.18s ease, background 0.18s ease, border-color 0.18s ease;
 }
 .page-template-container #masonry-container .gallery-photo-like:hover,
-.page-template-container #masonry-container .gallery-photo-like:focus-visible {
+.page-template-container #masonry-container .gallery-photo-like:focus-visible,
+.page-template-container #masonry-container .gallery-photo-like.is-expanded,
+.page-template-container #masonry-container .gallery-photo-like.is-count-visible {
+  opacity: 1;
+  transform: translate(0, 0) scale(1);
+}
+.page-template-container #masonry-container .gallery-photo-like:hover,
+.page-template-container #masonry-container .gallery-photo-like:focus-visible,
+.page-template-container #masonry-container .gallery-photo-like.is-expanded {
   color: rgba(163, 31, 52, 0.92);
   background: rgba(255, 255, 255, 0.28);
   border-color: rgba(255, 255, 255, 0.52);
@@ -2266,7 +2269,7 @@ html.is-animating .transition-navbar {
   transform: translateY(6px) scale(0.94);
 }
 .page-template-container #masonry-container .gallery-photo-like.is-count-visible .gallery-photo-like-count {
-  animation: gallery-photo-like-count 1.5s ease forwards;
+  animation: gallery-photo-like-count 1s ease forwards;
 }
 html.dark .page-template-container #masonry-container .gallery-photo-like,
 html[data-theme="dark"] .page-template-container #masonry-container .gallery-photo-like,
@@ -2287,7 +2290,7 @@ html[data-theme="dark"] .page-template-container #masonry-container .gallery-pho
 @keyframes gallery-photo-like-count {
   0% { opacity: 0; transform: translateY(6px) scale(0.94); }
   15% { opacity: 1; transform: translateY(0) scale(1); }
-  78% { opacity: 1; transform: translateY(0) scale(1); }
+  66% { opacity: 1; transform: translateY(0) scale(1); }
   100% { opacity: 0; transform: translateY(-5px) scale(0.96); }
 }
 @media (max-width: 640px) {

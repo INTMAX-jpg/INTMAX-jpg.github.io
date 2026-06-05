@@ -253,17 +253,22 @@ export function initMasonry() {
     return fetchGalleryLikeCount(imageKey);
   }
 
+  function expandGalleryLikeButton(button) {
+    button.classList.add("is-expanded");
+    clearTimeout(Number(button.dataset.retractTimer) || 0);
+    button.dataset.retractTimer = String(setTimeout(function () {
+      button.classList.remove("is-expanded", "is-count-visible");
+    }, 1000));
+  }
+
   function showGalleryLikeCount(button, count) {
     var countNode = button.querySelector(".gallery-photo-like-count");
     if (!countNode) return;
     countNode.textContent = String(Math.max(0, Number(count) || 0));
+    expandGalleryLikeButton(button);
     button.classList.remove("is-count-visible");
     void button.offsetWidth;
     button.classList.add("is-count-visible");
-    clearTimeout(Number(button.dataset.countHideTimer) || 0);
-    button.dataset.countHideTimer = String(setTimeout(function () {
-      button.classList.remove("is-count-visible");
-    }, 1500));
   }
 
   function playGalleryLikeBurst(button) {
@@ -277,6 +282,8 @@ export function initMasonry() {
 
   async function handleGalleryPhotoLike(button, imageKey) {
     if (button.dataset.likeBusy === "true") return;
+
+    expandGalleryLikeButton(button);
 
     if (hasLikedGalleryImage(imageKey)) {
       showGalleryLikeCount(button, Number(button.dataset.galleryLikeCount) || readLocalGalleryLikeCount(imageKey));
