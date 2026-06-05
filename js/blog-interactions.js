@@ -46,11 +46,20 @@ const galleryNoteText = "\u7167\u7247\u5c31\u50cf\u662f\u4ece\u4e09\u7ef4\u4e16\
 
 function removeGalleryNoteButton() {
   document.querySelectorAll(".gallery-note-reopen").forEach((element) => element.remove());
+  document.querySelectorAll(".gallery-note-title-anchor").forEach((element) => {
+    element.classList.remove("gallery-note-title-anchor");
+  });
+}
+
+function getGalleryNoteButtonHost() {
+  const headings = Array.from(document.querySelectorAll(".page-template-content h1, .page-template-content h2"));
+  return headings.find((heading) => heading.textContent.includes("于平凡中记录闪光")) || null;
 }
 
 function ensureGalleryNoteButton() {
   if (!isGalleryPage() || document.querySelector(".gallery-note-reopen")) return;
 
+  const host = getGalleryNoteButtonHost();
   const button = document.createElement("button");
   button.className = "gallery-note-reopen";
   button.type = "button";
@@ -60,7 +69,13 @@ function ensureGalleryNoteButton() {
     removeGalleryNoteButton();
     showGalleryNoteIntro({ replay: true });
   });
-  document.body.appendChild(button);
+
+  if (host) {
+    host.classList.add("gallery-note-title-anchor");
+    host.appendChild(button);
+  } else {
+    document.body.appendChild(button);
+  }
 }
 
 function clearGalleryNoteIntro() {
