@@ -364,7 +364,7 @@ export function initMasonry() {
       startedAt: performance.now(),
     };
     status.hidden = false;
-    status.classList.remove("complete");
+    status.classList.remove("complete", "is-fading");
     updateLoadStatus();
     progressUpdateTimer = setInterval(updateLoadStatus, 1000);
   }
@@ -422,7 +422,7 @@ export function initMasonry() {
       progress.status.classList.add("complete");
       clearInterval(progressUpdateTimer);
       progressHideTimer = setTimeout(function () {
-        progress.status.hidden = true;
+        progress.status.classList.add("is-fading");
       }, progress.failed ? 4200 : 2400);
       stabilizeLayout();
       return;

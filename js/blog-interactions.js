@@ -65,7 +65,8 @@ function showGalleryNoteIntro() {
   overlay.setAttribute("aria-live", "polite");
   overlay.innerHTML = `
     <div class="gallery-note-paper" role="status">
-      <p>照片就像是从三维世界裁下了一帧，带给这刹那穿越时空的力量~</p>
+      <p>照片就像是从三维世界裁下了一帧
+      带给这刹那穿越时空的力量</p>
     </div>
   `;
 
@@ -74,12 +75,12 @@ function showGalleryNoteIntro() {
 
   galleryNoteIntroTimer = window.setTimeout(() => {
     overlay.classList.add("is-leaving");
-  }, 5000);
+  }, 6500);
 
   galleryNoteIntroCleanupTimer = window.setTimeout(() => {
     overlay.remove();
     document.body.classList.remove("gallery-note-intro-active");
-  }, 5850);
+  }, 7350);
 }
 
 function canPreloadGallery() {

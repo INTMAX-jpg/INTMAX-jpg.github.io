@@ -2193,13 +2193,22 @@ html.is-animating .transition-navbar {
   transition: opacity 0.1s ease-out;
 }
 .page-template-container .gallery-load-status {
+  min-height: 1.5em;
   margin: 0 0 18px;
   color: var(--third-text-color);
   font-size: 0.9rem;
   line-height: 1.5;
   text-align: center;
   text-wrap: pretty;
-  transition: opacity 0.2s ease;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.8s ease, visibility 0s linear 0s;
+}
+.page-template-container .gallery-load-status.is-fading {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.8s ease, visibility 0s linear 0.8s;
 }
 .page-template-container .gallery-load-status::before {
   content: "";
