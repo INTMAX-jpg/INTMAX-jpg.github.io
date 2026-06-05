@@ -2,146 +2,204 @@
     {
         "name":  "00.jpg",
         "url":  "/images/gallery_compress/00.jpg",
-        "size":  2394646
+        "size":  2394646,
+        "width":  2160,
+        "height":  2879
     },
     {
         "name":  "01.png",
         "url":  "/images/gallery_compress/01.png",
-        "size":  19191085
+        "size":  19191085,
+        "width":  5568,
+        "height":  3712
     },
     {
         "name":  "02.JPG",
         "url":  "/images/gallery_compress/02.JPG",
-        "size":  2482994
+        "size":  2482994,
+        "width":  4032,
+        "height":  3024
     },
     {
         "name":  "03.JPG",
         "url":  "/images/gallery_compress/03.JPG",
-        "size":  22119350
+        "size":  22119350,
+        "width":  7008,
+        "height":  4672
     },
     {
         "name":  "04.JPG",
         "url":  "/images/gallery_compress/04.JPG",
-        "size":  2751963
+        "size":  2751963,
+        "width":  3024,
+        "height":  4032
     },
     {
         "name":  "05.png",
         "url":  "/images/gallery_compress/05.png",
-        "size":  274179
+        "size":  274179,
+        "width":  1161,
+        "height":  871
     },
     {
         "name":  "06.JPG",
         "url":  "/images/gallery_compress/06.JPG",
-        "size":  1381780
+        "size":  1381780,
+        "width":  2502,
+        "height":  1876
     },
     {
         "name":  "07.JPG",
         "url":  "/images/gallery_compress/07.JPG",
-        "size":  700089
+        "size":  700089,
+        "width":  1150,
+        "height":  1533
     },
     {
         "name":  "08.JPG",
         "url":  "/images/gallery_compress/08.JPG",
-        "size":  2034455
+        "size":  2034455,
+        "width":  3096,
+        "height":  2322
     },
     {
         "name":  "09.JPG",
         "url":  "/images/gallery_compress/09.JPG",
-        "size":  2892400
+        "size":  2892400,
+        "width":  7008,
+        "height":  4672
     },
     {
         "name":  "0A9C54ECB4B1788C8C9226D4D37F9571.png",
         "url":  "/images/gallery_compress/0A9C54ECB4B1788C8C9226D4D37F9571.png",
-        "size":  1057484
+        "size":  1057484,
+        "width":  1863,
+        "height":  2484
     },
     {
         "name":  "0F9D928F84F611BF844567E0188E707E.png",
         "url":  "/images/gallery_compress/0F9D928F84F611BF844567E0188E707E.png",
-        "size":  6277668
+        "size":  6277668,
+        "width":  1830,
+        "height":  2442
     },
     {
         "name":  "10.png",
         "url":  "/images/gallery_compress/10.png",
-        "size":  1654455
+        "size":  1654455,
+        "width":  4018,
+        "height":  2259
     },
     {
         "name":  "3877F2FD92A57ABB79C5A6244BD99603.png",
         "url":  "/images/gallery_compress/3877F2FD92A57ABB79C5A6244BD99603.png",
-        "size":  398070
+        "size":  398070,
+        "width":  1920,
+        "height":  1080
     },
     {
         "name":  "9AC5F6A9E50958BF1868BDEEF7713AA3.png",
         "url":  "/images/gallery_compress/9AC5F6A9E50958BF1868BDEEF7713AA3.png",
-        "size":  2812776
+        "size":  2812776,
+        "width":  2981,
+        "height":  2236
     },
     {
         "name":  "B24ACC827D88B9A49C39412052A847FF.png",
         "url":  "/images/gallery_compress/B24ACC827D88B9A49C39412052A847FF.png",
-        "size":  1456965
+        "size":  1456965,
+        "width":  3024,
+        "height":  4032
     },
     {
         "name":  "C0C1960615FD3EBBD970879B29BD386A.png",
         "url":  "/images/gallery_compress/C0C1960615FD3EBBD970879B29BD386A.png",
-        "size":  3629165
+        "size":  3629165,
+        "width":  3024,
+        "height":  4032
     },
     {
         "name":  "DSC_0461.JPG",
         "url":  "/images/gallery_compress/DSC_0461.JPG",
-        "size":  9128081
+        "size":  9128081,
+        "width":  5568,
+        "height":  3712
     },
     {
         "name":  "DSC_0650.JPG",
         "url":  "/images/gallery_compress/DSC_0650.JPG",
-        "size":  2898556
+        "size":  2898556,
+        "width":  5568,
+        "height":  3712
     },
     {
         "name":  "DSC_0652.JPG",
         "url":  "/images/gallery_compress/DSC_0652.JPG",
-        "size":  2670969
+        "size":  2670969,
+        "width":  5568,
+        "height":  3712
     },
     {
         "name":  "EE2D5169FD08CCDED37295B25044A683.png",
         "url":  "/images/gallery_compress/EE2D5169FD08CCDED37295B25044A683.png",
-        "size":  1343179
+        "size":  1343179,
+        "width":  2351,
+        "height":  1763
     },
     {
         "name":  "IMG_0175.JPG",
         "url":  "/images/gallery_compress/IMG_0175.JPG",
-        "size":  2273397
+        "size":  2273397,
+        "width":  3024,
+        "height":  4032
     },
     {
         "name":  "IMG_0359.JPG",
         "url":  "/images/gallery_compress/IMG_0359.JPG",
-        "size":  2923363
+        "size":  2923363,
+        "width":  2237,
+        "height":  2983
     },
     {
         "name":  "IMG_0401.JPG",
         "url":  "/images/gallery_compress/IMG_0401.JPG",
-        "size":  1134266
+        "size":  1134266,
+        "width":  2713,
+        "height":  2035
     },
     {
         "name":  "IMG_0407.JPG",
         "url":  "/images/gallery_compress/IMG_0407.JPG",
-        "size":  2640442
+        "size":  2640442,
+        "width":  2860,
+        "height":  3813
     },
     {
         "name":  "IMG_0430.JPG",
         "url":  "/images/gallery_compress/IMG_0430.JPG",
-        "size":  1507359
+        "size":  1507359,
+        "width":  2740,
+        "height":  3654
     },
     {
         "name":  "IMG_1122.JPG",
         "url":  "/images/gallery_compress/IMG_1122.JPG",
-        "size":  1832199
+        "size":  1832199,
+        "width":  2835,
+        "height":  2126
     },
     {
         "name":  "IMG_2200.JPG",
         "url":  "/images/gallery_compress/IMG_2200.JPG",
-        "size":  689810
+        "size":  689810,
+        "width":  3483,
+        "height":  2612
     },
     {
         "name":  "IMG_3987.JPG",
         "url":  "/images/gallery_compress/IMG_3987.JPG",
-        "size":  635724
+        "size":  635724,
+        "width":  2380,
+        "height":  3173
     }
 ]

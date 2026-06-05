@@ -12,6 +12,7 @@ export function initMasonry() {
   var loadProgress = null;
   var progressHideTimer = null;
   var progressUpdateTimer = null;
+  var resizeLayoutTimer = null;
 
   loadingPlaceholder.style.display = "block";
   masonryContainer.style.display = "none";
@@ -62,7 +63,7 @@ export function initMasonry() {
 
     var shell = document.createElement("div");
     shell.className = "masonry-image-shell loading";
-    shell.style.setProperty("--gallery-ratio", getPlaceholderRatio(index));
+    shell.style.setProperty("--gallery-ratio", getFileRatio(file, index));
 
     var img = document.createElement("img");
     img.alt = file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
@@ -85,7 +86,7 @@ export function initMasonry() {
       item.classList.add("masonry-item-loaded");
       shell.classList.remove("loading");
       settleImageLoad(img, true);
-      scheduleLayout();
+      stabilizeLayout();
     });
 
     img.addEventListener("error", function () {
@@ -93,12 +94,19 @@ export function initMasonry() {
       item.classList.add("masonry-item-error");
       shell.classList.remove("loading");
       settleImageLoad(img, false);
-      scheduleLayout();
+      stabilizeLayout();
     });
 
     shell.appendChild(img);
     item.appendChild(shell);
     return item;
+  }
+
+  function getFileRatio(file, index) {
+    if (file.width && file.height) {
+      return file.width + " / " + file.height;
+    }
+    return getPlaceholderRatio(index);
   }
 
   function getPlaceholderRatio(index) {
@@ -139,6 +147,8 @@ export function initMasonry() {
           name: item.name,
           url: "/images/gallery_compress/" + encodeURIComponent(item.name),
           size: Number(item.size) || 0,
+          width: Number(item.width) || 0,
+          height: Number(item.height) || 0,
         };
       });
   }
@@ -152,6 +162,8 @@ export function initMasonry() {
             name: file,
             url: "/images/gallery_compress/" + encodeURIComponent(file),
             size: 0,
+            width: 0,
+            height: 0,
           };
         }
 
@@ -160,6 +172,8 @@ export function initMasonry() {
             name: file.name,
             url: file.url,
             size: Number(file.size) || 0,
+            width: Number(file.width) || 0,
+            height: Number(file.height) || 0,
           };
         }
 
@@ -200,6 +214,8 @@ export function initMasonry() {
       surroundingGutter: false,
     });
     masonry.layout();
+    installMasonryRelayoutHooks();
+    stabilizeLayout();
   }
 
   function startProgressiveImageLoading() {
@@ -360,12 +376,34 @@ export function initMasonry() {
     return Math.ceil(seconds / 3600) + " 小时";
   }
 
-  function scheduleLayout() {
+  function installMasonryRelayoutHooks() {
+    if (masonryContainer.dataset.resizeHooked === "true") return;
+    masonryContainer.dataset.resizeHooked = "true";
+    window.addEventListener("resize", function () {
+      clearTimeout(resizeLayoutTimer);
+      resizeLayoutTimer = setTimeout(stabilizeLayout, 120);
+    });
+  }
+
+  function stabilizeLayout() {
+    if (!masonry) return;
+    requestAnimationFrame(function () {
+      masonry.layout();
+    });
+    setTimeout(function () {
+      if (masonry) masonry.layout();
+    }, 120);
+    setTimeout(function () {
+      if (masonry) masonry.layout();
+    }, 360);
+  }
+
+  function scheduleLayout(delay) {
     if (!masonry) return;
     clearTimeout(layoutTimer);
     layoutTimer = setTimeout(function () {
       masonry.layout();
-    }, 80);
+    }, delay || 80);
   }
 }
 

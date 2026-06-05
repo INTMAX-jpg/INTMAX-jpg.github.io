@@ -2153,7 +2153,7 @@ html.is-animating .transition-navbar {
   background: var(--third-background-color);
   box-shadow: var(--redefine-box-shadow-flat);
   overflow: hidden;
-  transition: box-shadow 0.2s ease, aspect-ratio 0.2s ease;
+  transition: box-shadow 0.2s ease;
 }
 .page-template-container #masonry-container .masonry-image-shell::before {
   content: "";
