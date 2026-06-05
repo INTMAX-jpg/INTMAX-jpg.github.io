@@ -42,11 +42,40 @@ function markGalleryNoteIntroSeen() {
   } catch (error) {}
 }
 
-function getGalleryGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "\u65e9\u4e0a\u597d\uff01";
-  if (hour < 18) return "\u4e0b\u5348\u597d\uff01";
-  return "\u665a\u4e0a\u597d\uff01";
+const galleryNoteText = "\u7167\u7247\u5c31\u50cf\u662f\u4ece\u4e09\u7ef4\u4e16\u754c\u88c1\u4e0b\u4e86\u4e00\u5e27\uff0c\u5e26\u7ed9\u8fd9\u5239\u90a3\u7a7f\u8d8a\u65f6\u7a7a\u7684\u529b\u91cf~";
+
+function removeGalleryNoteButton() {
+  document.querySelectorAll(".gallery-note-reopen").forEach((element) => element.remove());
+  document.querySelectorAll(".gallery-note-title-anchor").forEach((element) => {
+    element.classList.remove("gallery-note-title-anchor");
+  });
+}
+
+function getGalleryNoteButtonHost() {
+  const headings = Array.from(document.querySelectorAll(".page-template-content h1, .page-template-content h2"));
+  return headings.find((heading) => heading.textContent.includes("于平凡中记录闪光")) || null;
+}
+
+function ensureGalleryNoteButton() {
+  if (!isGalleryPage() || document.querySelector(".gallery-note-reopen")) return;
+
+  const host = getGalleryNoteButtonHost();
+  const button = document.createElement("button");
+  button.className = "gallery-note-reopen";
+  button.type = "button";
+  button.setAttribute("aria-label", "重新查看相册便签");
+  button.innerHTML = '<i class="fa-regular fa-envelope" aria-hidden="true"></i>';
+  button.addEventListener("click", () => {
+    removeGalleryNoteButton();
+    showGalleryNoteIntro({ replay: true });
+  });
+
+  if (host) {
+    host.classList.add("gallery-note-title-anchor");
+    host.appendChild(button);
+  } else {
+    document.body.appendChild(button);
+  }
 }
 
 function clearGalleryNoteIntro() {
@@ -56,6 +85,7 @@ function clearGalleryNoteIntro() {
   galleryNoteIntroCleanupTimer = null;
   document.querySelectorAll(".gallery-note-intro").forEach((element) => element.remove());
   document.body.classList.remove("gallery-note-intro-active");
+  removeGalleryNoteButton();
 }
 
 function createGalleryNoteIntroOverlay() {
@@ -68,26 +98,27 @@ function createGalleryNoteIntroOverlay() {
   paper.setAttribute("role", "status");
 
   const copy = document.createElement("p");
-  const greeting = document.createElement("span");
-  const welcome = document.createElement("span");
-  greeting.textContent = getGalleryGreeting();
-  welcome.textContent = "\u6b22\u8fce\u5230\u8bbf Zixi \u7684\u81ea\u7559\u5730";
-  copy.appendChild(greeting);
-  copy.appendChild(welcome);
+  copy.textContent = galleryNoteText;
 
   paper.appendChild(copy);
   overlay.appendChild(paper);
   return overlay;
 }
 
-function showGalleryNoteIntro() {
+function showGalleryNoteIntro(options = {}) {
   if (!isGalleryPage()) {
     clearGalleryNoteIntro();
     return;
   }
 
-  if (hasSeenGalleryNoteIntro() || document.querySelector(".gallery-note-intro")) return;
+  if (document.querySelector(".gallery-note-intro")) return;
+  if (!options.replay && hasSeenGalleryNoteIntro()) {
+    ensureGalleryNoteButton();
+    return;
+  }
+
   markGalleryNoteIntroSeen();
+  removeGalleryNoteButton();
 
   const overlay = createGalleryNoteIntroOverlay();
   document.body.appendChild(overlay);
@@ -95,12 +126,13 @@ function showGalleryNoteIntro() {
 
   galleryNoteIntroTimer = window.setTimeout(() => {
     overlay.classList.add("is-leaving");
-  }, 5000);
+  }, 6500);
 
   galleryNoteIntroCleanupTimer = window.setTimeout(() => {
     overlay.remove();
     document.body.classList.remove("gallery-note-intro-active");
-  }, 5850);
+    ensureGalleryNoteButton();
+  }, 7350);
 }
 function canPreloadGallery() {
   const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
