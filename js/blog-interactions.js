@@ -110,6 +110,42 @@ function createGalleryNoteIntroOverlay() {
   return overlay;
 }
 
+function getGalleryNoteExitTargetRect() {
+  const button = document.querySelector(".gallery-note-reopen");
+  if (button) return button.getBoundingClientRect();
+
+  const host = getGalleryNoteButtonHost();
+  if (!host) return null;
+
+  const rect = host.getBoundingClientRect();
+  const buttonSize = 38;
+  const gap = 12;
+  const targetLeft = Math.min(rect.right + gap, window.innerWidth - buttonSize - 16);
+  return {
+    left: targetLeft,
+    right: targetLeft + buttonSize,
+    top: rect.top + (rect.height - buttonSize) / 2,
+    bottom: rect.top + (rect.height + buttonSize) / 2,
+    width: buttonSize,
+    height: buttonSize,
+  };
+}
+
+function setGalleryNoteExitTarget(overlay) {
+  const paper = overlay?.querySelector(".gallery-note-paper");
+  const targetRect = getGalleryNoteExitTargetRect();
+  if (!paper || !targetRect) return;
+
+  const paperRect = paper.getBoundingClientRect();
+  const paperCenterX = paperRect.left + paperRect.width / 2;
+  const paperCenterY = paperRect.top + paperRect.height / 2;
+  const targetCenterX = targetRect.left + targetRect.width / 2;
+  const targetCenterY = targetRect.top + targetRect.height / 2;
+
+  overlay.style.setProperty("--gallery-note-exit-x", `${Math.round(targetCenterX - paperCenterX)}px`);
+  overlay.style.setProperty("--gallery-note-exit-y", `${Math.round(targetCenterY - paperCenterY)}px`);
+}
+
 function showGalleryNoteIntro(options = {}) {
   if (!isGalleryPage()) {
     clearGalleryNoteIntro();
@@ -130,6 +166,8 @@ function showGalleryNoteIntro(options = {}) {
   document.body.classList.add("gallery-note-intro-active");
 
   galleryNoteIntroTimer = window.setTimeout(() => {
+    ensureGalleryNoteButton();
+    setGalleryNoteExitTarget(overlay);
     overlay.classList.add("is-leaving");
   }, 6500);
 

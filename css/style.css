@@ -7320,6 +7320,8 @@ html[data-theme="dark"] .birthday-cake-intro,
   background: rgba(248, 246, 240, 0.42);
   backdrop-filter: blur(10px) saturate(1.04);
   opacity: 0;
+  --gallery-note-exit-x: min(42vw, 520px);
+  --gallery-note-exit-y: 0px;
   animation: zixi-gallery-note-overlay-in 0.32s ease-out forwards;
 }
 html.dark .gallery-note-intro,
@@ -7412,13 +7414,13 @@ html[data-theme="dark"] .gallery-note-intro,
     opacity: 0.9;
     filter: blur(0.4px);
     border-radius: 28px;
-    transform: translateX(min(38vw, 430px)) rotate(4deg) scale(0.28);
+    transform: translate(calc(var(--gallery-note-exit-x) * 0.82), calc(var(--gallery-note-exit-y) * 0.82)) rotate(4deg) scale(0.28);
   }
   100% {
     opacity: 0;
     filter: blur(1.8px);
     border-radius: 999px;
-    transform: translateX(min(42vw, 520px)) rotate(8deg) scale(0.12);
+    transform: translate(var(--gallery-note-exit-x), var(--gallery-note-exit-y)) rotate(8deg) scale(0.12);
   }
 }
 .page-template-container .page-template-content .gallery-note-title-anchor {
