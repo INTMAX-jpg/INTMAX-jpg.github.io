@@ -9,6 +9,7 @@ export function initMasonry() {
   var layoutTimer = null;
   var eagerCount = 3;
   var maxConcurrentLoads = 3;
+  var maxImageRetries = 2;
   var loadingQueue = [];
   var activeLoads = 0;
   var loadProgress = null;
@@ -118,11 +119,7 @@ export function initMasonry() {
     });
 
     img.addEventListener("error", function () {
-      item.classList.remove("masonry-item-loading");
-      item.classList.add("masonry-item-error");
-      shell.classList.remove("loading");
-      settleImageLoad(img, false);
-      stabilizeLayout();
+      handleImageError(img, item, shell);
     });
 
     shell.appendChild(img);
@@ -301,6 +298,41 @@ export function initMasonry() {
     img.src = img.dataset.src;
   }
 
+  function retryImageLoad(img) {
+    var retryCount = Number(img.dataset.retryCount) || 0;
+    img.dataset.retryCount = retryCount + 1;
+    img.dataset.loadStartedAt = performance.now();
+    img.removeAttribute("src");
+    setTimeout(function () {
+      img.src = img.dataset.src + (img.dataset.src.indexOf("?") >= 0 ? "&" : "?") + "retry=" + img.dataset.retryCount;
+    }, 260 * img.dataset.retryCount);
+  }
+
+  function handleImageError(img, item, shell) {
+    var retryCount = Number(img.dataset.retryCount) || 0;
+    if (retryCount < maxImageRetries) {
+      item.classList.add("masonry-item-loading");
+      item.classList.remove("masonry-item-error");
+      shell.classList.add("loading");
+      retryImageLoad(img);
+      return;
+    }
+
+    item.classList.remove("masonry-item-loading");
+    item.classList.add("masonry-item-error");
+    shell.classList.remove("loading");
+    settleImageLoad(img, false);
+    removeFailedGalleryItem(item);
+  }
+
+  function removeFailedGalleryItem(item) {
+    item.style.display = "none";
+    setTimeout(function () {
+      item.remove();
+      stabilizeLayout();
+    }, 120);
+  }
+
   function pumpLoadingQueue() {
     while (activeLoads < maxConcurrentLoads && loadingQueue.length) {
       var nextImage = loadingQueue.shift();
@@ -321,6 +353,7 @@ export function initMasonry() {
       total: files.length,
       completed: 0,
       failed: 0,
+      loaded: 0,
       completedBytes: 0,
       knownTotalBytes: files.reduce(function (total, file) {
         return total + (Number(file.size) || 0);
@@ -353,7 +386,11 @@ export function initMasonry() {
     img.dataset.loadSettled = "true";
     activeLoads = Math.max(0, activeLoads - 1);
     loadProgress.completed += 1;
-    if (!loaded) loadProgress.failed += 1;
+    if (loaded) {
+      loadProgress.loaded += 1;
+    } else {
+      loadProgress.failed += 1;
+    }
     loadProgress.completedBytes += getImageSize(img);
     updateLoadStatus();
     pumpLoadingQueue();
@@ -379,16 +416,15 @@ export function initMasonry() {
     var remainingCount = progress.total - progress.completed;
 
     if (remainingCount <= 0) {
-      progress.status.textContent =
-        "相册已加载完成，共 " +
-        progress.total +
-        " 张照片" +
-        (progress.failed ? "，" + progress.failed + " 张加载失败" : "");
+      progress.status.textContent = progress.failed
+        ? "相册已显示 " + progress.loaded + " 张照片，" + progress.failed + " 张加载失败，已自动跳过"
+        : "相册已加载完成，共 " + progress.loaded + " 张照片";
       progress.status.classList.add("complete");
       clearInterval(progressUpdateTimer);
       progressHideTimer = setTimeout(function () {
         progress.status.hidden = true;
-      }, 2400);
+      }, progress.failed ? 4200 : 2400);
+      stabilizeLayout();
       return;
     }
 
