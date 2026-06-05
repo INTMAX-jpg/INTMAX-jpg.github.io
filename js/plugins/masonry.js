@@ -1,3 +1,5 @@
+const galleryMasonryInstances = new WeakMap();
+
 export function initMasonry() {
   var loadingPlaceholder = document.querySelector(".loading-placeholder");
   var masonryContainer = document.querySelector("#masonry-container");
@@ -13,6 +15,18 @@ export function initMasonry() {
   var progressHideTimer = null;
   var progressUpdateTimer = null;
   var resizeLayoutTimer = null;
+  var layoutFrame = null;
+  var layoutObserver = null;
+  var currentBaseWidth = 0;
+
+  var existingInstance = galleryMasonryInstances.get(masonryContainer);
+  if (existingInstance) {
+    existingInstance.refresh();
+    return;
+  }
+  galleryMasonryInstances.set(masonryContainer, {
+    refresh: refreshMasonryInstance,
+  });
 
   loadingPlaceholder.style.display = "block";
   masonryContainer.style.display = "none";
@@ -27,6 +41,20 @@ export function initMasonry() {
       renderGalleryMessage("Photo loading failed. Please check images/gallery_compress/.");
       revealMasonryContainer();
     });
+
+  function refreshMasonryInstance() {
+    loadingPlaceholder.style.display = "none";
+    masonryContainer.style.display = "block";
+    masonryContainer.style.opacity = 1;
+
+    if (!masonry) {
+      initializeMasonryLayout();
+    } else {
+      stabilizeLayout();
+    }
+
+    pumpLoadingQueue();
+  }
 
   function loadGalleryImages() {
     if (masonryContainer.dataset.galleryLoaded === "true") {
@@ -206,16 +234,56 @@ export function initMasonry() {
   function initializeMasonryLayout() {
     if (!masonryContainer.querySelector(".masonry-item")) return;
 
+    if (!isMasonryContainerReady()) {
+      scheduleLayout(120);
+      return;
+    }
+
+    createMasonryLayout();
+    installMasonryRelayoutHooks();
+    stabilizeLayout();
+  }
+
+  function isMasonryContainerReady() {
+    return (
+      masonryContainer.isConnected &&
+      masonryContainer.style.display !== "none" &&
+      masonryContainer.clientWidth > 0
+    );
+  }
+
+  function getMasonryBaseWidth() {
+    return masonryContainer.clientWidth >= 768 ? 255 : 150;
+  }
+
+  function createMasonryLayout() {
+    if (masonry && typeof masonry.destroy === "function") {
+      masonry.destroy();
+    }
+
+    currentBaseWidth = getMasonryBaseWidth();
     masonry = new MiniMasonry({
-      baseWidth: window.innerWidth >= 768 ? 255 : 150,
+      baseWidth: currentBaseWidth,
       container: masonryContainer,
       gutterX: 10,
       gutterY: 10,
       surroundingGutter: false,
     });
+  }
+
+  function ensureMasonryLayout() {
+    if (!isMasonryContainerReady()) {
+      scheduleLayout(120);
+      return;
+    }
+
+    var nextBaseWidth = getMasonryBaseWidth();
+    if (!masonry || nextBaseWidth !== currentBaseWidth) {
+      createMasonryLayout();
+      return;
+    }
+
     masonry.layout();
-    installMasonryRelayoutHooks();
-    stabilizeLayout();
   }
 
   function startProgressiveImageLoading() {
@@ -379,30 +447,53 @@ export function initMasonry() {
   function installMasonryRelayoutHooks() {
     if (masonryContainer.dataset.resizeHooked === "true") return;
     masonryContainer.dataset.resizeHooked = "true";
+
     window.addEventListener("resize", function () {
       clearTimeout(resizeLayoutTimer);
       resizeLayoutTimer = setTimeout(stabilizeLayout, 120);
     });
+
+    if ("ResizeObserver" in window) {
+      layoutObserver = new ResizeObserver(function () {
+        clearTimeout(resizeLayoutTimer);
+        resizeLayoutTimer = setTimeout(stabilizeLayout, 80);
+      });
+      layoutObserver.observe(masonryContainer);
+      if (masonryContainer.parentElement) {
+        layoutObserver.observe(masonryContainer.parentElement);
+      }
+    }
   }
 
   function stabilizeLayout() {
-    if (!masonry) return;
-    requestAnimationFrame(function () {
-      masonry.layout();
+    if (!masonryContainer.isConnected) return;
+
+    if (!isMasonryContainerReady()) {
+      scheduleLayout(140);
+      return;
+    }
+
+    if (layoutFrame) cancelAnimationFrame(layoutFrame);
+    layoutFrame = requestAnimationFrame(function () {
+      ensureMasonryLayout();
     });
-    setTimeout(function () {
-      if (masonry) masonry.layout();
-    }, 120);
-    setTimeout(function () {
-      if (masonry) masonry.layout();
-    }, 360);
+
+    [120, 360, 760, 1200].forEach(function (delay) {
+      setTimeout(function () {
+        if (masonryContainer.isConnected) ensureMasonryLayout();
+      }, delay);
+    });
   }
 
   function scheduleLayout(delay) {
-    if (!masonry) return;
     clearTimeout(layoutTimer);
     layoutTimer = setTimeout(function () {
-      masonry.layout();
+      if (!masonryContainer.isConnected) return;
+      if (!masonry) {
+        initializeMasonryLayout();
+        return;
+      }
+      ensureMasonryLayout();
     }, delay || 80);
   }
 }
