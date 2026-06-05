@@ -6167,7 +6167,7 @@ html.is-animating .transition-fade-down {
 .home-sidebar-container .sidebar-content .statistics {
   display: grid !important;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  column-gap: 4px;
+  column-gap: 8px;
   align-items: start;
 }
 .home-sidebar-container .sidebar-content .statistics .item {
@@ -6193,8 +6193,11 @@ html.is-animating .transition-fade-down {
   width: 100%;
   min-height: 19px;
   color: var(--home-stat-label-color) !important;
-  line-height: 1.25;
+  font-size: clamp(0.72rem, 3.2vw, 0.82rem);
+  line-height: 1.2;
+  overflow: hidden;
   text-align: center;
+  text-overflow: clip;
   white-space: nowrap;
 }
 .home-sidebar-container .sidebar-content .statistics .home-likes-stat .home-like-value {

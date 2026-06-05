@@ -741,7 +741,7 @@ async function persistHomeLike() {
 function animateHomeStatNumber(node, target, options = {}) {
   if (!node) return;
   const value = Math.max(0, Math.floor(Number(target) || 0));
-  const duration = options.duration || 850;
+  const duration = options.duration || Math.min(1800, 1150 + String(value).length * 160);
   const startTime = performance.now();
   const render = (number) => {
     const text = String(number);
@@ -767,7 +767,7 @@ function animateHomeStatNumber(node, target, options = {}) {
 
   const tick = (now) => {
     const progress = Math.min((now - startTime) / duration, 1);
-    const eased = 1 - Math.pow(1 - progress, 3);
+    const eased = 1 - Math.pow(1 - progress, 4);
     render(Math.round(value * eased));
 
     if (progress < 1) {
