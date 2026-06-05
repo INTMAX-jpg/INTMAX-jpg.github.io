@@ -43,6 +43,15 @@
             // Initial application
             const theme = getTheme();
             applyTheme(theme);
+
+            try {
+                const path = window.location.pathname;
+                const isHome = path === "/" || path === "/index.html";
+                const hasSeenHomeNote = sessionStorage.getItem("ZIXI_HOME_NOTE_INTRO_SEEN") === "true";
+                if (isHome && !hasSeenHomeNote) {
+                    document.documentElement.classList.add("home-note-preroll");
+                }
+            } catch (e) {}
             
             // Listen for system preference changes
             matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ({ matches }) => {

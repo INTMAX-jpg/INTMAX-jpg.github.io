@@ -7613,3 +7613,10 @@ html[data-theme="dark"] .home-note-intro,
     animation-duration: 1ms !important;
   }
 }
+
+html.home-note-preroll .home-banner-background,
+html.home-note-preroll .home-banner-container,
+html.home-note-preroll .main-content-container {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}

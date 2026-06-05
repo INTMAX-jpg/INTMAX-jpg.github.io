@@ -158,6 +158,14 @@ function getHomeGreeting() {
   return "晚上好！";
 }
 
+function enterHomeNotePreroll() {
+  document.documentElement.classList.add("home-note-preroll");
+}
+
+function exitHomeNotePreroll() {
+  document.documentElement.classList.remove("home-note-preroll");
+}
+
 function clearHomeNoteIntro() {
   window.clearTimeout(homeNoteIntroTimer);
   window.clearTimeout(homeNoteIntroCleanupTimer);
@@ -165,6 +173,7 @@ function clearHomeNoteIntro() {
   homeNoteIntroCleanupTimer = null;
   document.querySelectorAll(".home-note-intro").forEach((element) => element.remove());
   document.body.classList.remove("home-note-intro-active");
+  exitHomeNotePreroll();
 }
 
 function createHomeNoteIntroOverlay() {
@@ -195,7 +204,11 @@ function showHomeNoteIntro() {
     return;
   }
 
-  if (hasSeenHomeNoteIntro() || document.querySelector(".home-note-intro")) return;
+  if (hasSeenHomeNoteIntro() || document.querySelector(".home-note-intro")) {
+    exitHomeNotePreroll();
+    return;
+  }
+  enterHomeNotePreroll();
   markHomeNoteIntroSeen();
 
   const overlay = createHomeNoteIntroOverlay();
@@ -209,6 +222,7 @@ function showHomeNoteIntro() {
   homeNoteIntroCleanupTimer = window.setTimeout(() => {
     overlay.remove();
     document.body.classList.remove("home-note-intro-active");
+    exitHomeNotePreroll();
   }, 5850);
 }
 function canPreloadGallery() {
