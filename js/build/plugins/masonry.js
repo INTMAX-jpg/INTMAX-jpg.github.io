@@ -7,7 +7,147 @@ const galleryLikeConfig = {
   supabaseKey: "sb_publishable_H5yhsQ854nw7VJuQXS1EJg_PYdGaMyC",
 };
 let galleryLikeClientPromise = null;
+const galleryCache = window.__GALLERY_CACHE__ || {
+  filesPromise: null,
+  files: null,
+  preloadedImages: new Map(),
+  preloadStarted: false,
+};
+const galleryPreloadImageLimit = 8;
+let masonryPagePreloadStarted = false;
 
+window.__GALLERY_CACHE__ = galleryCache;
+
+function getGalleryFiles() {
+  if (galleryCache.files) {
+    return Promise.resolve(galleryCache.files);
+  }
+
+  if (galleryCache.filesPromise) {
+    return galleryCache.filesPromise;
+  }
+
+  galleryCache.filesPromise = fetch("/images/gallery_compress/photos.json")
+    .then(function (response) {
+      if (!response.ok) throw new Error("No local gallery manifest");
+      return response.json();
+    })
+    .then(normalizeManifestFiles)
+    .catch(function () {
+      var repoApi =
+        "https://api.github.com/repos/INTMAX-jpg/INTMAX-jpg.github.io/contents/images/gallery_compress";
+      return fetch(repoApi)
+        .then(function (response) {
+          if (!response.ok) throw new Error("No GitHub gallery_compress directory");
+          return response.json();
+        })
+        .then(normalizeGithubFiles)
+        .catch(function () {
+          return [];
+        });
+    })
+    .then(function (files) {
+      galleryCache.files = files;
+      return files;
+    });
+
+  return galleryCache.filesPromise;
+}
+
+function normalizeGithubFiles(items) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .filter(function (item) {
+      return item.type === "file" && isImageFile(item.name);
+    })
+    .map(function (item) {
+      return {
+        name: item.name,
+        url: "/images/gallery_compress/" + encodeURIComponent(item.name),
+        size: Number(item.size) || 0,
+        width: Number(item.width) || 0,
+        height: Number(item.height) || 0,
+      };
+    });
+}
+
+function normalizeManifestFiles(files) {
+  if (!Array.isArray(files)) return [];
+  return files
+    .map(function (file) {
+      if (typeof file === "string") {
+        return {
+          name: file,
+          url: "/images/gallery_compress/" + encodeURIComponent(file),
+          size: 0,
+          width: 0,
+          height: 0,
+        };
+      }
+
+      if (file && file.name && file.url) {
+        return {
+          name: file.name,
+          url: file.url,
+          size: Number(file.size) || 0,
+          width: Number(file.width) || 0,
+          height: Number(file.height) || 0,
+        };
+      }
+
+      return null;
+    })
+    .filter(function (file) {
+      return file && isImageFile(file.name);
+    });
+}
+
+function isImageFile(name) {
+  return /\.(avif|gif|jpe?g|png|webp)$/i.test(name);
+}
+
+export function preloadGalleryData() {
+  if (galleryCache.preloadStarted) return galleryCache.filesPromise || Promise.resolve(galleryCache.files || []);
+  galleryCache.preloadStarted = true;
+
+  return getGalleryFiles().then(function (files) {
+    files.slice(0, galleryPreloadImageLimit).forEach(function (file) {
+      if (!file.url || galleryCache.preloadedImages.has(file.url)) return;
+      var preloadImage = new Image();
+      preloadImage.decoding = "async";
+      preloadImage.loading = "eager";
+      preloadImage.src = file.url;
+      galleryCache.preloadedImages.set(file.url, preloadImage);
+    });
+    return files;
+  });
+}
+
+function preloadMasonryPage() {
+  if (masonryPagePreloadStarted) return;
+  masonryPagePreloadStarted = true;
+
+  try {
+    if (window.swup && typeof window.swup.preload === "function") {
+      window.swup.preload("/masonry/");
+      return;
+    }
+    if (typeof swup !== "undefined" && typeof swup.preload === "function") {
+      swup.preload("/masonry/");
+      return;
+    }
+  } catch (e) {}
+
+  try {
+    fetch("/masonry/", { credentials: "same-origin" }).catch(function () {});
+  } catch (e) {}
+}
+
+function initGalleryRuntime() {
+  preloadMasonryPage();
+  preloadGalleryData();
+  initMasonry();
+}
 
 export function initMasonry() {
   var loadingPlaceholder = document.querySelector(".loading-placeholder");
@@ -343,80 +483,6 @@ export function initMasonry() {
     return ratios[index % ratios.length];
   }
 
-  function getGalleryFiles() {
-    return fetch("/images/gallery_compress/photos.json", { cache: "no-store" })
-      .then(function (response) {
-        if (!response.ok) throw new Error("No local gallery manifest");
-        return response.json();
-      })
-      .then(normalizeManifestFiles)
-      .catch(function () {
-        var repoApi =
-          "https://api.github.com/repos/INTMAX-jpg/INTMAX-jpg.github.io/contents/images/gallery_compress";
-        return fetch(repoApi, { cache: "no-store" })
-          .then(function (response) {
-            if (!response.ok) throw new Error("No GitHub gallery_compress directory");
-            return response.json();
-          })
-          .then(normalizeGithubFiles)
-          .catch(function () {
-            return [];
-          });
-      });
-  }
-
-  function normalizeGithubFiles(items) {
-    if (!Array.isArray(items)) return [];
-    return items
-      .filter(function (item) {
-        return item.type === "file" && isImageFile(item.name);
-      })
-      .map(function (item) {
-        return {
-          name: item.name,
-          url: "/images/gallery_compress/" + encodeURIComponent(item.name),
-          size: Number(item.size) || 0,
-          width: Number(item.width) || 0,
-          height: Number(item.height) || 0,
-        };
-      });
-  }
-
-  function normalizeManifestFiles(files) {
-    if (!Array.isArray(files)) return [];
-    return files
-      .map(function (file) {
-        if (typeof file === "string") {
-          return {
-            name: file,
-            url: "/images/gallery_compress/" + encodeURIComponent(file),
-            size: 0,
-            width: 0,
-            height: 0,
-          };
-        }
-
-        if (file && file.name && file.url) {
-          return {
-            name: file.name,
-            url: file.url,
-            size: Number(file.size) || 0,
-            width: Number(file.width) || 0,
-            height: Number(file.height) || 0,
-          };
-        }
-
-        return null;
-      })
-      .filter(function (file) {
-        return file && isImageFile(file.name);
-      });
-  }
-
-  function isImageFile(name) {
-    return /\.(avif|gif|jpe?g|png|webp)$/i.test(name);
-  }
-
   function renderGalleryMessage(message) {
     masonryContainer.innerHTML =
       '<p class="gallery-empty text-third-text-color">' + message + "</p>";
@@ -499,6 +565,13 @@ export function initMasonry() {
     if (!img || img.src) return;
     img.loading = "eager";
     img.dataset.loadStartedAt = performance.now();
+
+    var preloadedImage = galleryCache.preloadedImages.get(img.dataset.src);
+    if (preloadedImage && preloadedImage.complete && preloadedImage.naturalWidth > 0) {
+      img.src = preloadedImage.src;
+      return;
+    }
+
     img.src = img.dataset.src;
   }
 
@@ -803,10 +876,8 @@ export function initMasonry() {
   }
 }
 
-if (data.masonry) {
-  try {
-    swup.hooks.on("page:view", initMasonry);
-  } catch (e) {}
+try {
+  swup.hooks.on("page:view", initGalleryRuntime);
+} catch (e) {}
 
-  document.addEventListener("DOMContentLoaded", initMasonry);
-}
+document.addEventListener("DOMContentLoaded", initGalleryRuntime);

@@ -1,4 +1,153 @@
 const galleryMasonryInstances = new WeakMap();
+const galleryLikeConfig = {
+  storageKey: "ZIXI_GALLERY_LIKE_COUNTS",
+  visitStorageKey: "ZIXI_GALLERY_VISIT_LIKES",
+  table: "gallery_likes",
+  supabaseUrl: "https://lfjmmzvabkpneglaevvi.supabase.co",
+  supabaseKey: "sb_publishable_H5yhsQ854nw7VJuQXS1EJg_PYdGaMyC",
+};
+let galleryLikeClientPromise = null;
+const galleryCache = window.__GALLERY_CACHE__ || {
+  filesPromise: null,
+  files: null,
+  preloadedImages: new Map(),
+  preloadStarted: false,
+};
+const galleryPreloadImageLimit = 8;
+let masonryPagePreloadStarted = false;
+
+window.__GALLERY_CACHE__ = galleryCache;
+
+function getGalleryFiles() {
+  if (galleryCache.files) {
+    return Promise.resolve(galleryCache.files);
+  }
+
+  if (galleryCache.filesPromise) {
+    return galleryCache.filesPromise;
+  }
+
+  galleryCache.filesPromise = fetch("/images/gallery_compress/photos.json")
+    .then(function (response) {
+      if (!response.ok) throw new Error("No local gallery manifest");
+      return response.json();
+    })
+    .then(normalizeManifestFiles)
+    .catch(function () {
+      var repoApi =
+        "https://api.github.com/repos/INTMAX-jpg/INTMAX-jpg.github.io/contents/images/gallery_compress";
+      return fetch(repoApi)
+        .then(function (response) {
+          if (!response.ok) throw new Error("No GitHub gallery_compress directory");
+          return response.json();
+        })
+        .then(normalizeGithubFiles)
+        .catch(function () {
+          return [];
+        });
+    })
+    .then(function (files) {
+      galleryCache.files = files;
+      return files;
+    });
+
+  return galleryCache.filesPromise;
+}
+
+function normalizeGithubFiles(items) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .filter(function (item) {
+      return item.type === "file" && isImageFile(item.name);
+    })
+    .map(function (item) {
+      return {
+        name: item.name,
+        url: "/images/gallery_compress/" + encodeURIComponent(item.name),
+        size: Number(item.size) || 0,
+        width: Number(item.width) || 0,
+        height: Number(item.height) || 0,
+      };
+    });
+}
+
+function normalizeManifestFiles(files) {
+  if (!Array.isArray(files)) return [];
+  return files
+    .map(function (file) {
+      if (typeof file === "string") {
+        return {
+          name: file,
+          url: "/images/gallery_compress/" + encodeURIComponent(file),
+          size: 0,
+          width: 0,
+          height: 0,
+        };
+      }
+
+      if (file && file.name && file.url) {
+        return {
+          name: file.name,
+          url: file.url,
+          size: Number(file.size) || 0,
+          width: Number(file.width) || 0,
+          height: Number(file.height) || 0,
+        };
+      }
+
+      return null;
+    })
+    .filter(function (file) {
+      return file && isImageFile(file.name);
+    });
+}
+
+function isImageFile(name) {
+  return /\.(avif|gif|jpe?g|png|webp)$/i.test(name);
+}
+
+export function preloadGalleryData() {
+  if (galleryCache.preloadStarted) return galleryCache.filesPromise || Promise.resolve(galleryCache.files || []);
+  galleryCache.preloadStarted = true;
+
+  return getGalleryFiles().then(function (files) {
+    files.slice(0, galleryPreloadImageLimit).forEach(function (file) {
+      if (!file.url || galleryCache.preloadedImages.has(file.url)) return;
+      var preloadImage = new Image();
+      preloadImage.decoding = "async";
+      preloadImage.loading = "eager";
+      preloadImage.src = file.url;
+      galleryCache.preloadedImages.set(file.url, preloadImage);
+    });
+    return files;
+  });
+}
+
+function preloadMasonryPage() {
+  if (masonryPagePreloadStarted) return;
+  masonryPagePreloadStarted = true;
+
+  try {
+    if (window.swup && typeof window.swup.preload === "function") {
+      window.swup.preload("/masonry/");
+      return;
+    }
+    if (typeof swup !== "undefined" && typeof swup.preload === "function") {
+      swup.preload("/masonry/");
+      return;
+    }
+  } catch (e) {}
+
+  try {
+    fetch("/masonry/", { credentials: "same-origin" }).catch(function () {});
+  } catch (e) {}
+}
+
+function initGalleryRuntime() {
+  preloadMasonryPage();
+  preloadGalleryData();
+  initMasonry();
+}
 
 export function initMasonry() {
   var loadingPlaceholder = document.querySelector(".loading-placeholder");
@@ -122,8 +271,184 @@ export function initMasonry() {
     });
 
     shell.appendChild(img);
+    shell.appendChild(createGalleryLikeButton(file));
     item.appendChild(shell);
     return item;
+  }
+
+  function createGalleryLikeButton(file) {
+    var imageKey = getGalleryLikeImageKey(file);
+    var button = document.createElement("button");
+    button.className = "gallery-photo-like";
+    button.type = "button";
+    button.dataset.galleryLikeKey = imageKey;
+    button.setAttribute("aria-label", "\u4e3a\u8fd9\u5f20\u7167\u7247\u70b9\u8d5e");
+    button.setAttribute("aria-pressed", hasLikedGalleryImage(imageKey) ? "true" : "false");
+    button.innerHTML = '<i class="fa-solid fa-heart" aria-hidden="true"></i><span class="gallery-photo-like-count" role="status" aria-live="polite"></span>';
+    button.classList.toggle("is-liked", hasLikedGalleryImage(imageKey));
+
+    button.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      handleGalleryPhotoLike(button, imageKey);
+    });
+
+    return button;
+  }
+
+  function getGalleryLikeImageKey(file) {
+    var raw = file && (file.url || file.name) ? file.url || file.name : "unknown";
+    return String(raw).replace(/^https?:\/\/[^/]+/i, "").split("?")[0];
+  }
+
+  function readGalleryLikeCounts() {
+    try {
+      return JSON.parse(localStorage.getItem(galleryLikeConfig.storageKey) || "{}");
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function writeGalleryLikeCounts(counts) {
+    try {
+      localStorage.setItem(galleryLikeConfig.storageKey, JSON.stringify(counts));
+    } catch (error) {}
+  }
+
+  function readGalleryVisitLikes() {
+    try {
+      return JSON.parse(sessionStorage.getItem(galleryLikeConfig.visitStorageKey) || "{}");
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function writeGalleryVisitLikes(likes) {
+    try {
+      sessionStorage.setItem(galleryLikeConfig.visitStorageKey, JSON.stringify(likes));
+    } catch (error) {}
+  }
+
+  function hasLikedGalleryImage(imageKey) {
+    return readGalleryVisitLikes()[imageKey] === true;
+  }
+
+  function markGalleryImageLiked(imageKey) {
+    var likes = readGalleryVisitLikes();
+    likes[imageKey] = true;
+    writeGalleryVisitLikes(likes);
+  }
+
+  function incrementLocalGalleryLikeCount(imageKey) {
+    var counts = readGalleryLikeCounts();
+    counts[imageKey] = Math.max(0, Number(counts[imageKey]) || 0) + 1;
+    writeGalleryLikeCounts(counts);
+    return counts[imageKey];
+  }
+
+  function readLocalGalleryLikeCount(imageKey) {
+    var counts = readGalleryLikeCounts();
+    return Math.max(0, Number(counts[imageKey]) || 0);
+  }
+
+  function getGalleryLikeClient() {
+    if (!galleryLikeClientPromise) {
+      galleryLikeClientPromise = import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm")
+        .then(function (module) {
+          return module.createClient(galleryLikeConfig.supabaseUrl, galleryLikeConfig.supabaseKey, {
+            auth: { persistSession: false, autoRefreshToken: false },
+          });
+        });
+    }
+    return galleryLikeClientPromise;
+  }
+
+  function getGalleryVisitId() {
+    var key = "ZIXI_GALLERY_VISIT_ID";
+    var id = sessionStorage.getItem(key);
+    if (!id) {
+      id = window.crypto?.randomUUID?.() || String(Date.now()) + "-" + Math.random().toString(36).slice(2);
+      sessionStorage.setItem(key, id);
+    }
+    return id;
+  }
+
+  async function fetchGalleryLikeCount(imageKey) {
+    var supabase = await getGalleryLikeClient();
+    var result = await supabase
+      .from(galleryLikeConfig.table)
+      .select("id", { count: "exact", head: true })
+      .eq("image_key", imageKey);
+    if (result.error) throw result.error;
+    return result.count || 0;
+  }
+
+  async function persistGalleryLike(imageKey) {
+    var supabase = await getGalleryLikeClient();
+    var result = await supabase.from(galleryLikeConfig.table).insert({
+      image_key: imageKey,
+      visit_id: getGalleryVisitId(),
+    });
+    if (result.error) throw result.error;
+    return fetchGalleryLikeCount(imageKey);
+  }
+
+  function expandGalleryLikeButton(button) {
+    button.classList.add("is-expanded");
+    clearTimeout(Number(button.dataset.retractTimer) || 0);
+    button.dataset.retractTimer = String(setTimeout(function () {
+      button.classList.remove("is-expanded", "is-count-visible");
+    }, 1000));
+  }
+
+  function showGalleryLikeCount(button, count) {
+    var countNode = button.querySelector(".gallery-photo-like-count");
+    if (!countNode) return;
+    countNode.textContent = String(Math.max(0, Number(count) || 0));
+    expandGalleryLikeButton(button);
+    button.classList.remove("is-count-visible");
+    void button.offsetWidth;
+    button.classList.add("is-count-visible");
+  }
+
+  function playGalleryLikeBurst(button) {
+    button.classList.remove("is-popping");
+    void button.offsetWidth;
+    button.classList.add("is-popping");
+    setTimeout(function () {
+      button.classList.remove("is-popping");
+    }, 520);
+  }
+
+  async function handleGalleryPhotoLike(button, imageKey) {
+    if (button.dataset.likeBusy === "true") return;
+
+    expandGalleryLikeButton(button);
+
+    if (hasLikedGalleryImage(imageKey)) {
+      showGalleryLikeCount(button, Number(button.dataset.galleryLikeCount) || readLocalGalleryLikeCount(imageKey));
+      return;
+    }
+
+    button.dataset.likeBusy = "true";
+    markGalleryImageLiked(imageKey);
+    button.classList.add("is-liked");
+    button.setAttribute("aria-pressed", "true");
+    playGalleryLikeBurst(button);
+
+    var count = incrementLocalGalleryLikeCount(imageKey);
+    showGalleryLikeCount(button, count);
+
+    try {
+      count = await persistGalleryLike(imageKey);
+      button.dataset.galleryLikeCount = String(count);
+      showGalleryLikeCount(button, count);
+    } catch (error) {
+      console.warn("Gallery likes are using local fallback.", error);
+      button.dataset.galleryLikeCount = String(count);
+    } finally {
+      button.dataset.likeBusy = "false";
+    }
   }
 
   function waitForImageDecode(img) {
@@ -156,80 +481,6 @@ export function initMasonry() {
   function getPlaceholderRatio(index) {
     var ratios = ["4 / 3", "3 / 4", "1 / 1", "5 / 4", "4 / 5", "16 / 10"];
     return ratios[index % ratios.length];
-  }
-
-  function getGalleryFiles() {
-    return fetch("/images/gallery_compress/photos.json", { cache: "no-store" })
-      .then(function (response) {
-        if (!response.ok) throw new Error("No local gallery manifest");
-        return response.json();
-      })
-      .then(normalizeManifestFiles)
-      .catch(function () {
-        var repoApi =
-          "https://api.github.com/repos/INTMAX-jpg/INTMAX-jpg.github.io/contents/images/gallery_compress";
-        return fetch(repoApi, { cache: "no-store" })
-          .then(function (response) {
-            if (!response.ok) throw new Error("No GitHub gallery_compress directory");
-            return response.json();
-          })
-          .then(normalizeGithubFiles)
-          .catch(function () {
-            return [];
-          });
-      });
-  }
-
-  function normalizeGithubFiles(items) {
-    if (!Array.isArray(items)) return [];
-    return items
-      .filter(function (item) {
-        return item.type === "file" && isImageFile(item.name);
-      })
-      .map(function (item) {
-        return {
-          name: item.name,
-          url: "/images/gallery_compress/" + encodeURIComponent(item.name),
-          size: Number(item.size) || 0,
-          width: Number(item.width) || 0,
-          height: Number(item.height) || 0,
-        };
-      });
-  }
-
-  function normalizeManifestFiles(files) {
-    if (!Array.isArray(files)) return [];
-    return files
-      .map(function (file) {
-        if (typeof file === "string") {
-          return {
-            name: file,
-            url: "/images/gallery_compress/" + encodeURIComponent(file),
-            size: 0,
-            width: 0,
-            height: 0,
-          };
-        }
-
-        if (file && file.name && file.url) {
-          return {
-            name: file.name,
-            url: file.url,
-            size: Number(file.size) || 0,
-            width: Number(file.width) || 0,
-            height: Number(file.height) || 0,
-          };
-        }
-
-        return null;
-      })
-      .filter(function (file) {
-        return file && isImageFile(file.name);
-      });
-  }
-
-  function isImageFile(name) {
-    return /\.(avif|gif|jpe?g|png|webp)$/i.test(name);
   }
 
   function renderGalleryMessage(message) {
@@ -314,6 +565,13 @@ export function initMasonry() {
     if (!img || img.src) return;
     img.loading = "eager";
     img.dataset.loadStartedAt = performance.now();
+
+    var preloadedImage = galleryCache.preloadedImages.get(img.dataset.src);
+    if (preloadedImage && preloadedImage.complete && preloadedImage.naturalWidth > 0) {
+      img.src = preloadedImage.src;
+      return;
+    }
+
     img.src = img.dataset.src;
   }
 
@@ -618,10 +876,8 @@ export function initMasonry() {
   }
 }
 
-if (data.masonry) {
-  try {
-    swup.hooks.on("page:view", initMasonry);
-  } catch (e) {}
+try {
+  swup.hooks.on("page:view", initGalleryRuntime);
+} catch (e) {}
 
-  document.addEventListener("DOMContentLoaded", initMasonry);
-}
+document.addEventListener("DOMContentLoaded", initGalleryRuntime);
