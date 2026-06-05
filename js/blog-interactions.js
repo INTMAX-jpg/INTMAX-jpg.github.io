@@ -683,6 +683,40 @@ function isHomePage() {
   return window.location.pathname === "/" || window.location.pathname === "/index.html";
 }
 
+const zixiBirthday = {
+  year: 2005,
+  month: 6,
+  day: 29,
+};
+
+function isZixiBirthdayToday(date = new Date()) {
+  return date.getMonth() + 1 === zixiBirthday.month && date.getDate() === zixiBirthday.day;
+}
+
+function showBirthdayCakeIntro() {
+  if (!isHomePage() || !isZixiBirthdayToday()) return;
+  if (document.body.dataset.zixiBirthdayCakeIntro === "playing") return;
+
+  document.body.dataset.zixiBirthdayCakeIntro = "playing";
+  const overlay = document.createElement("div");
+  overlay.className = "birthday-cake-intro";
+  overlay.setAttribute("aria-hidden", "true");
+  overlay.innerHTML = `
+    <div class="birthday-cake-intro-glow"></div>
+    <div class="birthday-cake-intro-cake">🎂</div>
+    <div class="birthday-cake-intro-text">Happy Birthday, Zixi</div>
+  `;
+  document.body.appendChild(overlay);
+  document.body.classList.add("birthday-home-intro-active");
+
+  window.setTimeout(() => overlay.classList.add("is-leaving"), 1850);
+  window.setTimeout(() => {
+    overlay.remove();
+    document.body.classList.remove("birthday-home-intro-active");
+    delete document.body.dataset.zixiBirthdayCakeIntro;
+  }, 2450);
+}
+
 function isCommentsPage() {
   return window.location.pathname.replace(/\/index\.html$/, "/") === "/comments/";
 }
@@ -820,6 +854,26 @@ function renderHomeLikeCount(count = readSiteLikeCount(), animate = false) {
   });
 }
 
+function createHomeBirthdayBurst(container) {
+  const popper = document.createElement("span");
+  popper.className = "home-birthday-popper";
+  popper.textContent = "🎉";
+  container.appendChild(popper);
+  popper.addEventListener("animationend", () => popper.remove(), { once: true });
+
+  for (let index = 0; index < 18; index += 1) {
+    const confetti = document.createElement("span");
+    confetti.className = "home-birthday-confetti";
+    confetti.style.setProperty("--x", `${Math.round((Math.random() - 0.5) * 96)}px`);
+    confetti.style.setProperty("--y", `${Math.round(-36 - Math.random() * 78)}px`);
+    confetti.style.setProperty("--r", `${Math.round((Math.random() - 0.5) * 360)}deg`);
+    confetti.style.setProperty("--h", `${Math.round(Math.random() * 360)}deg`);
+    confetti.style.animationDelay = `${index * 18}ms`;
+    container.appendChild(confetti);
+    confetti.addEventListener("animationend", () => confetti.remove(), { once: true });
+  }
+}
+
 function createHomeLikeBurst(container) {
   for (let index = 0; index < 9; index += 1) {
     const heart = document.createElement("span");
@@ -844,7 +898,11 @@ async function incrementHomeLikes(item) {
     number.classList.remove("is-popping");
     void number.offsetWidth;
     number.classList.add("is-popping");
-    createHomeLikeBurst(number);
+    if (isZixiBirthdayToday()) {
+      createHomeBirthdayBurst(number);
+    } else {
+      createHomeLikeBurst(number);
+    }
     window.setTimeout(() => number.classList.remove("is-popping"), 1000);
   }
 
@@ -865,7 +923,9 @@ function initHomeLikes() {
     item.removeAttribute("href");
     item.setAttribute("role", "button");
     item.setAttribute("tabindex", "0");
-    item.setAttribute("aria-label", "Like this blog");
+    const birthdayMode = isZixiBirthdayToday();
+    item.classList.toggle("is-birthday-likes", birthdayMode);
+    item.setAttribute("aria-label", birthdayMode ? "祝 Zixi 生日快乐" : "Like this blog");
 
     const number = item.querySelector(".number");
     const label = item.querySelector(".label");
@@ -873,10 +933,19 @@ function initHomeLikes() {
     if (number && !number.dataset.homeLikesCount) {
       number.dataset.homeLikesCount = "true";
       number.classList.add("home-like-count");
-      number.innerHTML = '<span class="home-like-value">0</span><i class="fa-solid fa-heart home-like-heart-icon" aria-hidden="true"></i>';
+      number.innerHTML = birthdayMode
+        ? '<span class="home-like-value">0</span><span class="home-like-party-icon" aria-hidden="true">🎉</span>'
+        : '<span class="home-like-value">0</span><i class="fa-solid fa-heart home-like-heart-icon" aria-hidden="true"></i>';
+    } else if (number && number.dataset.homeLikeMode !== (birthdayMode ? "birthday" : "like")) {
+      const value = number.querySelector(".home-like-value")?.textContent || number.textContent.trim() || "0";
+      number.innerHTML = birthdayMode
+        ? `<span class="home-like-value">${value}</span><span class="home-like-party-icon" aria-hidden="true">🎉</span>`
+        : `<span class="home-like-value">${value}</span><i class="fa-solid fa-heart home-like-heart-icon" aria-hidden="true"></i>`;
     }
 
-    if (label) label.textContent = "点赞";
+    if (number) number.dataset.homeLikeMode = birthdayMode ? "birthday" : "like";
+
+    if (label) label.textContent = birthdayMode ? "生日快乐！" : "点赞";
 
     if (!item.dataset.homeLikesBound) {
       item.dataset.homeLikesBound = "true";
@@ -1293,6 +1362,7 @@ function initSiteGuestbook(force = false) {
 }
 function initBlogInteractions() {
   scheduleGalleryPreload();
+  showBirthdayCakeIntro();
   randomizeHomeHeroQuote();
   initAuth();
   initSiteGuestbook();

@@ -24,6 +24,8 @@ const createBirthdayDate = (year) => new Date(year, BIRTH_MONTH - 1, BIRTH_DAY, 
 
 const formatBirthdayDate = (date) => `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
 
+const isZixiBirthday = (date) => date.getMonth() + 1 === BIRTH_MONTH && date.getDate() === BIRTH_DAY;
+
 const getNextBirthday = (now) => {
   let birthday = createBirthdayDate(now.getFullYear());
   if (birthday.getTime() <= now.getTime()) {
@@ -43,7 +45,49 @@ const renderDuration = (prefix, duration) => {
   setRuntimeValue(`${prefix}_seconds`, duration.seconds);
 };
 
+const ensureBirthdayTodayMessage = () => {
+  let message = document.getElementById("birthday_today_message");
+  if (message) return message;
+
+  const nextBirthdayLine = document.querySelector(".next-birthday-countdown");
+  message = document.createElement("div");
+  message.id = "birthday_today_message";
+  message.className = "birthday-today-message";
+  message.hidden = true;
+
+  if (nextBirthdayLine) {
+    nextBirthdayLine.insertAdjacentElement("beforebegin", message);
+  }
+
+  return message;
+};
+
+const setBirthdayCountdownVisible = (visible) => {
+  document.querySelectorAll(".next-birthday-countdown").forEach((element) => {
+    element.hidden = !visible;
+  });
+
+  const birthday100Days = document.getElementById("birthday_days");
+  if (birthday100Days?.parentElement) {
+    birthday100Days.parentElement.hidden = !visible;
+  }
+};
+
 const renderNextBirthday = (now) => {
+  const todayMessage = ensureBirthdayTodayMessage();
+
+  if (isZixiBirthday(now)) {
+    setBirthdayCountdownVisible(false);
+    if (todayMessage) {
+      todayMessage.textContent = `Zixi的${now.getFullYear() - BIRTH_YEAR}岁生日就是今天！`;
+      todayMessage.hidden = false;
+    }
+    return;
+  }
+
+  if (todayMessage) todayMessage.hidden = true;
+  setBirthdayCountdownVisible(true);
+
   const nextBirthday = getNextBirthday(now);
   setRuntimeValue("next_birthday_age", nextBirthday.age);
   setRuntimeValue("next_birthday_date", formatBirthdayDate(nextBirthday.date));
