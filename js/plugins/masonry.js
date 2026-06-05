@@ -197,6 +197,7 @@ export function initMasonry() {
     loadingPlaceholder.style.display = "none";
     masonryContainer.style.display = "block";
     masonryContainer.style.opacity = 1;
+    revealGalleryContinued();
 
     if (!masonry) {
       initializeMasonryLayout();
@@ -489,6 +490,17 @@ export function initMasonry() {
     masonryContainer.dataset.galleryLoaded = "true";
   }
 
+  function revealGalleryContinued() {
+    var continued = document.querySelector(".gallery-continued");
+    if (!continued) {
+      continued = document.createElement("p");
+      continued.className = "gallery-continued";
+      continued.textContent = "--To be continued--";
+      masonryContainer.insertAdjacentElement("afterend", continued);
+    }
+    continued.hidden = false;
+  }
+
   function revealMasonryContainer() {
     loadingPlaceholder.style.opacity = 0;
     setTimeout(function () {
@@ -496,6 +508,7 @@ export function initMasonry() {
     }, 100);
     masonryContainer.style.display = "block";
     masonryContainer.style.opacity = 1;
+    revealGalleryContinued();
   }
 
   function initializeMasonryLayout() {

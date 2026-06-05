@@ -2320,7 +2320,8 @@ html[data-theme="dark"] .page-template-container #masonry-container .gallery-pho
   min-height: 1.5em;
   margin: 0 0 18px;
   color: var(--third-text-color);
-  font-size: 0.9rem;
+  font-family: "Segoe Print", "Bradley Hand ITC", "KaiTi", "STKaiti", "Comic Sans MS", cursive;
+  font-size: 1rem;
   line-height: 1.5;
   text-align: center;
   text-wrap: pretty;
@@ -2349,6 +2350,16 @@ html[data-theme="dark"] .page-template-container #masonry-container .gallery-pho
 .page-template-container .gallery-load-status.complete::before {
   border-color: var(--primary-color);
   animation: none;
+}
+.page-template-container .gallery-continued {
+  margin: 28px 0 4px;
+  color: var(--third-text-color);
+  font-family: "Segoe Print", "Bradley Hand ITC", "KaiTi", "STKaiti", "Comic Sans MS", cursive;
+  font-size: clamp(1rem, 2.6vw, 1.38rem);
+  font-weight: 600;
+  line-height: 1.6;
+  letter-spacing: 0;
+  text-align: center;
 }
 @keyframes gallery-status-spin {
   to {
