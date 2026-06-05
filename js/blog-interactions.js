@@ -42,6 +42,27 @@ function markGalleryNoteIntroSeen() {
   } catch (error) {}
 }
 
+const galleryNoteText = "\u7167\u7247\u5c31\u50cf\u662f\u4ece\u4e09\u7ef4\u4e16\u754c\u88c1\u4e0b\u4e86\u4e00\u5e27\uff0c\u5e26\u7ed9\u8fd9\u5239\u90a3\u7a7f\u8d8a\u65f6\u7a7a\u7684\u529b\u91cf~";
+
+function removeGalleryNoteButton() {
+  document.querySelectorAll(".gallery-note-reopen").forEach((element) => element.remove());
+}
+
+function ensureGalleryNoteButton() {
+  if (!isGalleryPage() || document.querySelector(".gallery-note-reopen")) return;
+
+  const button = document.createElement("button");
+  button.className = "gallery-note-reopen";
+  button.type = "button";
+  button.setAttribute("aria-label", "重新查看相册便签");
+  button.innerHTML = '<i class="fa-regular fa-envelope" aria-hidden="true"></i>';
+  button.addEventListener("click", () => {
+    removeGalleryNoteButton();
+    showGalleryNoteIntro({ replay: true });
+  });
+  document.body.appendChild(button);
+}
+
 function clearGalleryNoteIntro() {
   window.clearTimeout(galleryNoteIntroTimer);
   window.clearTimeout(galleryNoteIntroCleanupTimer);
@@ -49,27 +70,42 @@ function clearGalleryNoteIntro() {
   galleryNoteIntroCleanupTimer = null;
   document.querySelectorAll(".gallery-note-intro").forEach((element) => element.remove());
   document.body.classList.remove("gallery-note-intro-active");
+  removeGalleryNoteButton();
 }
 
-function showGalleryNoteIntro() {
+function createGalleryNoteIntroOverlay() {
+  const overlay = document.createElement("div");
+  overlay.className = "gallery-note-intro";
+  overlay.setAttribute("aria-live", "polite");
+
+  const paper = document.createElement("div");
+  paper.className = "gallery-note-paper";
+  paper.setAttribute("role", "status");
+
+  const copy = document.createElement("p");
+  copy.textContent = galleryNoteText;
+
+  paper.appendChild(copy);
+  overlay.appendChild(paper);
+  return overlay;
+}
+
+function showGalleryNoteIntro(options = {}) {
   if (!isGalleryPage()) {
     clearGalleryNoteIntro();
     return;
   }
 
-  if (hasSeenGalleryNoteIntro() || document.querySelector(".gallery-note-intro")) return;
+  if (document.querySelector(".gallery-note-intro")) return;
+  if (!options.replay && hasSeenGalleryNoteIntro()) {
+    ensureGalleryNoteButton();
+    return;
+  }
+
   markGalleryNoteIntroSeen();
+  removeGalleryNoteButton();
 
-  const overlay = document.createElement("div");
-  overlay.className = "gallery-note-intro";
-  overlay.setAttribute("aria-live", "polite");
-  overlay.innerHTML = `
-    <div class="gallery-note-paper" role="status">
-      <p>照片就像是从三维世界裁下了一帧
-      带给这刹那穿越时空的力量</p>
-    </div>
-  `;
-
+  const overlay = createGalleryNoteIntroOverlay();
   document.body.appendChild(overlay);
   document.body.classList.add("gallery-note-intro-active");
 
@@ -80,9 +116,9 @@ function showGalleryNoteIntro() {
   galleryNoteIntroCleanupTimer = window.setTimeout(() => {
     overlay.remove();
     document.body.classList.remove("gallery-note-intro-active");
+    ensureGalleryNoteButton();
   }, 7350);
 }
-
 function canPreloadGallery() {
   const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
   if (!connection) return true;
