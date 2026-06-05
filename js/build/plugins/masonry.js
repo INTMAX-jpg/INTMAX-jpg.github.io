@@ -19,6 +19,7 @@ export function initMasonry() {
   var layoutFrame = null;
   var layoutObserver = null;
   var currentBaseWidth = 0;
+  var renderAuditTimers = [];
 
   var existingInstance = galleryMasonryInstances.get(masonryContainer);
   if (existingInstance) {
@@ -111,11 +112,9 @@ export function initMasonry() {
           img.naturalWidth + " / " + img.naturalHeight,
         );
       }
-      item.classList.remove("masonry-item-loading");
-      item.classList.add("masonry-item-loaded");
-      shell.classList.remove("loading");
-      settleImageLoad(img, true);
-      stabilizeLayout();
+      waitForImageDecode(img).then(function () {
+        markImageRendered(img, item, shell);
+      });
     });
 
     img.addEventListener("error", function () {
@@ -127,6 +126,26 @@ export function initMasonry() {
     return item;
   }
 
+  function waitForImageDecode(img) {
+    if (!img.decode) return Promise.resolve();
+
+    return Promise.race([
+      img.decode().catch(function () {}),
+      new Promise(function (resolve) {
+        setTimeout(resolve, 1800);
+      }),
+    ]);
+  }
+
+  function markImageRendered(img, item, shell) {
+    if (img.dataset.rendered === "true") return;
+    img.dataset.rendered = "true";
+    item.classList.remove("masonry-item-loading");
+    item.classList.add("masonry-item-loaded");
+    shell.classList.remove("loading");
+    settleImageLoad(img, true);
+    stabilizeLayout();
+  }
   function getFileRatio(file, index) {
     if (file.width && file.height) {
       return file.width + " / " + file.height;
@@ -348,6 +367,7 @@ export function initMasonry() {
     var status = getLoadStatusElement();
     clearTimeout(progressHideTimer);
     clearInterval(progressUpdateTimer);
+    clearRenderAuditTimers();
     loadProgress = {
       status: status,
       total: files.length,
@@ -416,6 +436,14 @@ export function initMasonry() {
     var remainingCount = progress.total - progress.completed;
 
     if (remainingCount <= 0) {
+      var pendingRenderCount = auditGalleryRenderState();
+      if (pendingRenderCount > 0) {
+        progress.status.textContent = "相册正在完成最后的渲染校准，剩余 " + pendingRenderCount + " 张照片";
+        scheduleRenderAudit(360);
+        stabilizeLayout();
+        return;
+      }
+
       progress.status.textContent = progress.failed
         ? "相册已显示 " + progress.loaded + " 张照片，" + progress.failed + " 张加载失败，已自动跳过"
         : "相册已加载完成，共 " + progress.loaded + " 张照片";
@@ -425,6 +453,9 @@ export function initMasonry() {
         progress.status.classList.add("is-fading");
       }, progress.failed ? 4200 : 2400);
       stabilizeLayout();
+      scheduleRenderAudit(160);
+      scheduleRenderAudit(720);
+      scheduleRenderAudit(1600);
       return;
     }
 
@@ -473,6 +504,59 @@ export function initMasonry() {
       "）";
   }
 
+  function auditGalleryRenderState() {
+    var pending = 0;
+    var images = masonryContainer.querySelectorAll(".masonry-item img");
+
+    images.forEach(function (img) {
+      var item = img.closest(".masonry-item");
+      var shell = img.closest(".masonry-image-shell");
+      if (!item || item.classList.contains("masonry-item-error")) return;
+
+      if (img.complete && img.naturalWidth > 0 && img.naturalHeight > 0) {
+        if (shell) {
+          shell.style.setProperty(
+            "--gallery-ratio",
+            img.naturalWidth + " / " + img.naturalHeight,
+          );
+        }
+        markImageRendered(img, item, shell || item);
+        return;
+      }
+
+      pending += 1;
+      item.classList.add("masonry-item-loading");
+      if (shell) shell.classList.add("loading");
+
+      if (img.dataset.src && !img.src) {
+        loadingQueue.unshift(img);
+      }
+    });
+
+    pumpLoadingQueue();
+    return pending;
+  }
+
+  function clearRenderAuditTimers() {
+    renderAuditTimers.forEach(function (timer) {
+      clearTimeout(timer);
+    });
+    renderAuditTimers = [];
+  }
+
+  function scheduleRenderAudit(delay) {
+    var timer = setTimeout(function () {
+      renderAuditTimers = renderAuditTimers.filter(function (entry) {
+        return entry !== timer;
+      });
+      if (!masonryContainer.isConnected) return;
+      var pending = auditGalleryRenderState();
+      stabilizeLayout();
+      if (pending > 0) scheduleRenderAudit(900);
+    }, delay || 240);
+
+    renderAuditTimers.push(timer);
+  }
   function formatRemainingTime(seconds) {
     if (!seconds || seconds < 10) return "几秒";
     if (seconds < 60) return seconds + " 秒";
