@@ -5474,6 +5474,15 @@ div.tabs .tab-content .tab-pane .note:last-child {
 .page-container .main-content-container .main-content-body .main-content-footer {
   width: 100%;
 }
+.footer,
+.footer span,
+.footer div,
+.footer a,
+.footer .odometer,
+.footer .odometer * {
+  font-family: "Segoe Print", "Bradley Hand ITC", "KaiTi", "STKaiti", "Comic Sans MS", cursive !important;
+  letter-spacing: 0;
+}
 .page-container .post-tools {
   position: fixed;
   top: 108px;
