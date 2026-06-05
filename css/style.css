@@ -7502,6 +7502,10 @@ html[data-theme="dark"] .gallery-note-intro,
   text-align: left;
   text-wrap: balance;
 }
+.gallery-note-signature {
+  display: block;
+  text-align: right;
+}
 .gallery-note-intro.is-leaving {
   pointer-events: none;
   animation: zixi-gallery-note-overlay-out 0.82s ease-in forwards;

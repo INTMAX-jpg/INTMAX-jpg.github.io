@@ -47,7 +47,7 @@ function markGalleryNoteIntroSeen() {
   } catch (error) {}
 }
 
-const galleryNoteText = "摄影<br>就像是从这世界裁下了一帧<br>带给刹那穿越时空的力量~<br><span style=\"display: block; text-align: right;\">--Zixi</span>";
+const galleryNoteText = "\u6444\u5f71<br>\u5c31\u50cf\u662f\u4ece\u8fd9\u4e16\u754c\u88c1\u4e0b\u4e86\u4e00\u5e27<br>\u5e26\u7ed9\u5239\u90a3\u7a7f\u8d8a\u65f6\u7a7a\u7684\u529b\u91cf~<br><span class=\"gallery-note-signature\">--Zixi</span>";
 
 function removeGalleryNoteButton() {
   document.querySelectorAll(".gallery-note-reopen").forEach((element) => element.remove());
@@ -103,7 +103,7 @@ function createGalleryNoteIntroOverlay() {
   paper.setAttribute("role", "status");
 
   const copy = document.createElement("p");
-  copy.textContent = galleryNoteText;
+  copy.innerHTML = galleryNoteText;
 
   paper.appendChild(copy);
   overlay.appendChild(paper);
