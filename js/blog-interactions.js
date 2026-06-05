@@ -720,10 +720,10 @@ async function syncHomeLikeCount() {
   try {
     const count = await fetchSiteLikeCount();
     writeSiteLikeCount(count);
-    renderHomeLikeCount(count);
+    renderHomeLikeCount(count, true);
   } catch (error) {
     console.warn("Supabase site_likes is not ready; using local like count.", error);
-    renderHomeLikeCount();
+    renderHomeLikeCount(readSiteLikeCount(), true);
   }
 }
 
@@ -738,17 +738,80 @@ async function persistHomeLike() {
   return fetchSiteLikeCount();
 }
 
+function animateHomeStatNumber(node, target, options = {}) {
+  if (!node) return;
+  const value = Math.max(0, Math.floor(Number(target) || 0));
+  const duration = options.duration || 850;
+  const startTime = performance.now();
+  const render = (number) => {
+    const text = String(number);
+    const valueNode = node.querySelector(".home-like-value");
+    if (valueNode) {
+      valueNode.textContent = text;
+    } else {
+      node.textContent = text;
+    }
+    if (node.dataset.homeLikesCount === "true") fitHomeLikeCount(node, number);
+  };
+
+  cancelAnimationFrame(Number(node.dataset.homeStatAnimationFrame) || 0);
+  node.dataset.homeStatTarget = String(value);
+  node.dataset.homeStatCount = "true";
+
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || value === 0) {
+    render(value);
+    return;
+  }
+
+  render(0);
+
+  const tick = (now) => {
+    const progress = Math.min((now - startTime) / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    render(Math.round(value * eased));
+
+    if (progress < 1) {
+      node.dataset.homeStatAnimationFrame = String(requestAnimationFrame(tick));
+    } else {
+      render(value);
+      delete node.dataset.homeStatAnimationFrame;
+    }
+  };
+
+  node.dataset.homeStatAnimationFrame = String(requestAnimationFrame(tick));
+}
+
+function animateHomeStats() {
+  if (!isHomePage()) return;
+  document.querySelectorAll("[data-home-stat-count]:not([data-home-likes-count])").forEach((node) => {
+    animateHomeStatNumber(node, node.dataset.homeStatTarget || node.textContent);
+  });
+}
+
+function prepareHomePostsCount() {
+  document.querySelectorAll('.statistics a[href="/archives"] .number').forEach((node) => {
+    node.dataset.homeStatCount = "true";
+    node.dataset.homeStatTarget = node.dataset.homeStatTarget || node.textContent.trim() || "0";
+  });
+}
+
 function fitHomeLikeCount(node, count) {
   const length = String(count).length;
   const size = Math.max(0.62, Math.min(1.5, 1.48 - Math.max(0, length - 2) * 0.12));
   node.style.fontSize = `${size}rem`;
 }
 
-function renderHomeLikeCount(count = readSiteLikeCount()) {
+function renderHomeLikeCount(count = readSiteLikeCount(), animate = false) {
   document.querySelectorAll("[data-home-likes-count]").forEach((node) => {
-    const value = node.querySelector(".home-like-value");
-    if (value) value.textContent = String(count);
+    node.dataset.homeStatTarget = String(count);
+    node.dataset.homeStatCount = "true";
     fitHomeLikeCount(node, count);
+    if (animate) {
+      animateHomeStatNumber(node, count);
+    } else {
+      const value = node.querySelector(".home-like-value");
+      if (value) value.textContent = String(count);
+    }
   });
 }
 
@@ -826,7 +889,7 @@ function initHomeLikes() {
     }
   });
 
-  renderHomeLikeCount();
+  renderHomeLikeCount(readSiteLikeCount(), true);
   syncHomeLikeCount();
 }
 
@@ -862,13 +925,15 @@ async function updateSiteCommentCount() {
 
   const count = await fetchSiteCommentCount();
   countNodes.forEach((node) => {
-    node.textContent = String(count);
+    node.dataset.homeStatTarget = String(count);
+    animateHomeStatNumber(node, count);
   });
 }
 
 function initHomeGuestbook() {
   if (!isHomePage()) return;
 
+  prepareHomePostsCount();
   initHomeLikes();
 
   document.querySelectorAll('.statistics a[href="/categories"]').forEach((item) => {
@@ -876,7 +941,11 @@ function initHomeGuestbook() {
     item.classList.add("site-comments-stat");
     const number = item.querySelector(".number");
     const label = item.querySelector(".label");
-    if (number) number.setAttribute("data-site-comments-count", "true");
+    if (number) {
+      number.setAttribute("data-site-comments-count", "true");
+      number.dataset.homeStatCount = "true";
+      number.dataset.homeStatTarget = number.dataset.homeStatTarget || number.textContent.trim() || "0";
+    }
     if (label) label.textContent = "Comments";
   });
 
@@ -893,6 +962,7 @@ function initHomeGuestbook() {
 
   ensureGuestbookModal();
   updateSiteCommentCount();
+  animateHomeStats();
 }
 
 function ensureGuestbookModal() {

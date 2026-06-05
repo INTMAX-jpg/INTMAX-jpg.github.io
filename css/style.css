@@ -6162,18 +6162,38 @@ html.is-animating .transition-fade-down {
   font-size: 0.8rem;
   color: var(--third-text-color);
 }
+.home-sidebar-container .sidebar-content .statistics {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 4px;
+  align-items: start;
+}
 .home-sidebar-container .sidebar-content .statistics .item {
   min-width: 0;
+  width: 100% !important;
   color: var(--home-stat-number-color);
+  text-align: center;
+  text-decoration: none;
 }
 .home-sidebar-container .sidebar-content .statistics .item .number {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 34px;
   color: var(--home-stat-number-color) !important;
   font-variant-numeric: tabular-nums;
-  line-height: 1.08;
+  line-height: 1;
+  text-align: center;
   text-shadow: var(--home-stat-number-shadow);
 }
 .home-sidebar-container .sidebar-content .statistics .item .label {
+  display: block;
+  width: 100%;
+  min-height: 19px;
   color: var(--home-stat-label-color) !important;
+  line-height: 1.25;
+  text-align: center;
+  white-space: nowrap;
 }
 .home-sidebar-container .sidebar-content .statistics .home-likes-stat .home-like-value {
   color: var(--home-stat-number-color);
@@ -6679,8 +6699,9 @@ html.is-animating .transition-fade-down {
   display: grid;
   place-items: center;
   width: 100%;
-  max-width: 74px;
+  max-width: 100%;
   height: 34px;
+  min-height: 34px;
   min-width: 0;
   line-height: 1;
   overflow: visible;
