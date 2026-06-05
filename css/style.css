@@ -7507,6 +7507,7 @@ html[data-theme="dark"] .gallery-note-reopen,
   backdrop-filter: blur(10px) saturate(1.04);
   opacity: 0;
   animation: zixi-gallery-note-overlay-in 0.32s ease-out forwards;
+  touch-action: none;
 }
 html.dark .home-note-intro,
 html[data-theme="dark"] .home-note-intro,
@@ -7619,4 +7620,10 @@ html.home-note-preroll .home-banner-container,
 html.home-note-preroll .main-content-container {
   opacity: 0 !important;
   visibility: hidden !important;
+}
+
+html.home-note-interaction-lock,
+body.home-note-intro-active {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
 }

@@ -26,6 +26,8 @@ let galleryNoteIntroTimer = null;
 let galleryNoteIntroCleanupTimer = null;
 let homeNoteIntroTimer = null;
 let homeNoteIntroCleanupTimer = null;
+let homeNoteScrollY = 0;
+let homeNoteInteractionLocked = false;
 
 function isGalleryPage() {
   return window.location.pathname.startsWith("/masonry");
@@ -158,12 +160,53 @@ function getHomeGreeting() {
   return "晚上好！";
 }
 
+function preventHomeNoteScroll(event) {
+  event.preventDefault();
+}
+
+function preventHomeNoteKeyboardScroll(event) {
+  const blockedKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End", " "];
+  if (blockedKeys.includes(event.key)) event.preventDefault();
+}
+
+function lockHomeNoteInteraction() {
+  if (homeNoteInteractionLocked) return;
+  homeNoteInteractionLocked = true;
+  homeNoteScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+  document.documentElement.classList.add("home-note-interaction-lock");
+  document.body.style.position = "fixed";
+  document.body.style.top = `-${homeNoteScrollY}px`;
+  document.body.style.left = "0";
+  document.body.style.right = "0";
+  document.body.style.width = "100%";
+  window.addEventListener("wheel", preventHomeNoteScroll, { passive: false });
+  window.addEventListener("touchmove", preventHomeNoteScroll, { passive: false });
+  window.addEventListener("keydown", preventHomeNoteKeyboardScroll, true);
+}
+
+function unlockHomeNoteInteraction() {
+  if (!homeNoteInteractionLocked) return;
+  homeNoteInteractionLocked = false;
+  window.removeEventListener("wheel", preventHomeNoteScroll, { passive: false });
+  window.removeEventListener("touchmove", preventHomeNoteScroll, { passive: false });
+  window.removeEventListener("keydown", preventHomeNoteKeyboardScroll, true);
+  document.documentElement.classList.remove("home-note-interaction-lock");
+  document.body.style.position = "";
+  document.body.style.top = "";
+  document.body.style.left = "";
+  document.body.style.right = "";
+  document.body.style.width = "";
+  window.scrollTo(0, homeNoteScrollY);
+}
+
 function enterHomeNotePreroll() {
   document.documentElement.classList.add("home-note-preroll");
+  lockHomeNoteInteraction();
 }
 
 function exitHomeNotePreroll() {
   document.documentElement.classList.remove("home-note-preroll");
+  unlockHomeNoteInteraction();
 }
 
 function clearHomeNoteIntro() {
