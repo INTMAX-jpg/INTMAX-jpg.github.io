@@ -7318,11 +7318,15 @@ html.is-animating .transition-fade-down {
 .page-template-container #masonry-container .masonry-item:hover .masonry-image-shell {
   box-shadow: var(--redefine-box-shadow-flat);
 }
-.page-template-container:has(#masonry-container) {
-  margin-bottom: 28px;
+.page-container:has(#masonry-container) .main-content-container {
+  justify-content: flex-start !important;
+  min-height: auto !important;
 }
-.page-container .main-content-container .main-content-body:has(#masonry-container) .main-content-footer {
-  margin-top: 32px !important;
+.page-template-container:has(#masonry-container) {
+  margin-bottom: 16px;
+}
+.page-container:has(#masonry-container) .main-content-footer {
+  margin-top: 20px !important;
 }
 
 .home-birthday-popper,
