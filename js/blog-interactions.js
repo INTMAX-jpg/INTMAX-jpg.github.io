@@ -1641,6 +1641,39 @@ function initSiteGuestbook(force = false) {
     renderGuestbookHistory();
   }
 }
+
+function initHomeArticleCardLinks() {
+  document.querySelectorAll(".home-article-item").forEach((item) => {
+    if (item.dataset.cardLinkBound === "true") return;
+
+    const link = item.querySelector(".home-article-title a[href], .home-article-meta-info-container a[href]");
+    if (!link) return;
+
+    item.dataset.cardLinkBound = "true";
+    item.setAttribute("role", "link");
+    item.setAttribute("tabindex", "0");
+    item.setAttribute("aria-label", link.textContent.trim() || "Open article");
+
+    const openArticle = (event) => {
+      const interactiveTarget = event.target.closest("a, button, input, textarea, select, summary, [role='button']");
+      if (interactiveTarget && interactiveTarget !== item) return;
+
+      if (event.metaKey || event.ctrlKey) {
+        window.open(link.href, "_blank", "noopener");
+        return;
+      }
+
+      link.click();
+    };
+
+    item.addEventListener("click", openArticle);
+    item.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      openArticle(event);
+    });
+  });
+}
 function initBlogInteractions() {
   scheduleGalleryPreload();
   showGalleryNoteIntro();
@@ -1649,6 +1682,7 @@ function initBlogInteractions() {
   randomizeHomeHeroQuote();
   initAuth();
   initSiteGuestbook();
+  initHomeArticleCardLinks();
   const context = getPostContext();
   if (!context) return;
 

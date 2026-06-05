@@ -5733,6 +5733,7 @@ html.is-animating .transition-fade-down {
   background: var(--background-color);
   margin-bottom: 38px;
   box-shadow: var(--redefine-box-shadow);
+  cursor: pointer;
   transition-property: color, background, box-shadow, border-color, transform;
   transition-delay: 0s, 0s, 0s, 0s, 0s;
   transition-duration: 0.2s, 0.2s, 0.2s, 0.2s, 0.2s;
@@ -5748,8 +5749,13 @@ html.is-animating .transition-fade-down {
     margin-bottom: 22.8px;
   }
 }
-.home-content-container .home-article-list .home-article-item:hover {
+.home-content-container .home-article-list .home-article-item:hover,
+.home-content-container .home-article-list .home-article-item:focus-visible {
   box-shadow: var(--redefine-box-shadow-hover);
+}
+.home-content-container .home-article-list .home-article-item:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary-color) 54%, transparent);
+  outline-offset: 4px;
 }
 @media (max-width: 768px) {
   .home-content-container .home-article-list .home-article-item {
