@@ -7301,3 +7301,123 @@ html[data-theme="dark"] .birthday-cake-intro,
     animation-iteration-count: 1 !important;
   }
 }
+.gallery-note-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 10045;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(248, 246, 240, 0.42);
+  backdrop-filter: blur(10px) saturate(1.04);
+  opacity: 0;
+  animation: zixi-gallery-note-overlay-in 0.32s ease-out forwards;
+}
+html.dark .gallery-note-intro,
+html[data-theme="dark"] .gallery-note-intro,
+:root[data-theme="dark"] .gallery-note-intro {
+  background: rgba(14, 15, 18, 0.46);
+}
+.gallery-note-paper {
+  position: relative;
+  width: min(560px, calc(100vw - 44px));
+  min-height: 250px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(30px, 6vw, 54px) clamp(28px, 6vw, 58px);
+  color: #5f5048;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0) 34%),
+    repeating-linear-gradient(0deg, transparent 0, transparent 31px, rgba(151, 118, 93, 0.11) 32px),
+    #fff5cf;
+  border: 1px solid rgba(130, 96, 64, 0.12);
+  border-radius: 3px 9px 4px 11px;
+  box-shadow: 0 28px 70px rgba(68, 57, 48, 0.2), 0 8px 18px rgba(68, 57, 48, 0.12);
+  transform: rotate(-2.2deg) translateY(8px) scale(0.96);
+  transform-origin: 50% 48%;
+  animation: zixi-gallery-note-paper-in 0.54s cubic-bezier(0.2, 0.82, 0.22, 1) forwards;
+}
+.gallery-note-paper::before {
+  content: "";
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  width: 116px;
+  height: 34px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.38), rgba(255, 232, 160, 0.52));
+  box-shadow: 0 2px 8px rgba(95, 80, 72, 0.12);
+  transform: translateX(-50%) rotate(1.5deg);
+}
+.gallery-note-paper::after {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  border: 1px solid rgba(130, 96, 64, 0.06);
+  pointer-events: none;
+}
+.gallery-note-paper p {
+  margin: 0;
+  font-family: "Segoe Print", "Bradley Hand ITC", "KaiTi", "STKaiti", "Comic Sans MS", cursive;
+  font-size: clamp(1.08rem, 3.8vw, 1.72rem);
+  font-weight: 600;
+  line-height: 1.95;
+  letter-spacing: 0;
+  text-align: left;
+  text-wrap: balance;
+}
+.gallery-note-intro.is-leaving {
+  pointer-events: none;
+  animation: zixi-gallery-note-overlay-out 0.82s ease-in forwards;
+}
+.gallery-note-intro.is-leaving .gallery-note-paper {
+  animation: zixi-gallery-note-paper-out 0.82s cubic-bezier(0.38, 0, 0.2, 1) forwards;
+}
+@keyframes zixi-gallery-note-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes zixi-gallery-note-overlay-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes zixi-gallery-note-paper-in {
+  from {
+    opacity: 0;
+    transform: rotate(-4deg) translateY(18px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(-2.2deg) translateY(0) scale(1);
+  }
+}
+@keyframes zixi-gallery-note-paper-out {
+  from {
+    opacity: 1;
+    filter: blur(0);
+    transform: rotate(-2.2deg) translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    filter: blur(2px);
+    transform: rotate(1deg) translateY(-8px) scale(1.22);
+  }
+}
+@media (max-width: 640px) {
+  .gallery-note-paper {
+    min-height: 230px;
+    transform: rotate(-1.4deg) translateY(8px) scale(0.96);
+  }
+  .gallery-note-paper p {
+    line-height: 1.82;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gallery-note-intro,
+  .gallery-note-paper,
+  .gallery-note-intro.is-leaving,
+  .gallery-note-intro.is-leaving .gallery-note-paper {
+    animation-duration: 1ms !important;
+  }
+}
