@@ -7318,6 +7318,12 @@ html.is-animating .transition-fade-down {
 .page-template-container #masonry-container .masonry-item:hover .masonry-image-shell {
   box-shadow: var(--redefine-box-shadow-flat);
 }
+.page-template-container:has(#masonry-container) {
+  margin-bottom: 28px;
+}
+.page-container .main-content-container .main-content-body:has(#masonry-container) .main-content-footer {
+  margin-top: 32px !important;
+}
 
 .home-birthday-popper,
 .home-birthday-confetti {
