@@ -789,9 +789,14 @@ function animateHomeStats() {
 }
 
 function prepareHomePostsCount() {
-  document.querySelectorAll('.statistics a[href="/archives"] .number').forEach((node) => {
-    node.dataset.homeStatCount = "true";
-    node.dataset.homeStatTarget = node.dataset.homeStatTarget || node.textContent.trim() || "0";
+  document.querySelectorAll('.statistics a[href="/archives"]').forEach((item) => {
+    const number = item.querySelector(".number");
+    const label = item.querySelector(".label");
+    if (number) {
+      number.dataset.homeStatCount = "true";
+      number.dataset.homeStatTarget = number.dataset.homeStatTarget || number.textContent.trim() || "0";
+    }
+    if (label) label.textContent = "帖子";
   });
 }
 
@@ -871,7 +876,7 @@ function initHomeLikes() {
       number.innerHTML = '<span class="home-like-value">0</span><i class="fa-solid fa-heart home-like-heart-icon" aria-hidden="true"></i>';
     }
 
-    if (label) label.textContent = "Likes";
+    if (label) label.textContent = "点赞";
 
     if (!item.dataset.homeLikesBound) {
       item.dataset.homeLikesBound = "true";
@@ -946,7 +951,7 @@ function initHomeGuestbook() {
       number.dataset.homeStatCount = "true";
       number.dataset.homeStatTarget = number.dataset.homeStatTarget || number.textContent.trim() || "0";
     }
-    if (label) label.textContent = "Comments";
+    if (label) label.textContent = "评论";
   });
 
   document.querySelectorAll(".home-sidebar-container .sidebar-content").forEach((sidebar) => {
