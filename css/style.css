@@ -7495,3 +7495,121 @@ html[data-theme="dark"] .gallery-note-reopen,
     animation-duration: 1ms !important;
   }
 }
+
+.home-note-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 10046;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(248, 246, 240, 0.42);
+  backdrop-filter: blur(10px) saturate(1.04);
+  opacity: 0;
+  animation: zixi-gallery-note-overlay-in 0.32s ease-out forwards;
+}
+html.dark .home-note-intro,
+html[data-theme="dark"] .home-note-intro,
+:root[data-theme="dark"] .home-note-intro {
+  background: rgba(14, 15, 18, 0.46);
+}
+.home-note-paper {
+  position: relative;
+  width: min(520px, calc(100vw - 44px));
+  min-height: 230px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(32px, 6vw, 54px) clamp(30px, 6vw, 58px);
+  color: #5f5048;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0) 34%),
+    repeating-linear-gradient(0deg, transparent 0, transparent 31px, rgba(151, 118, 93, 0.11) 32px),
+    #fff5cf;
+  border: 1px solid rgba(130, 96, 64, 0.12);
+  border-radius: 5px 11px 4px 10px;
+  box-shadow: 0 28px 70px rgba(68, 57, 48, 0.2), 0 8px 18px rgba(68, 57, 48, 0.12);
+  transform: rotate(1.8deg) translateY(8px) scale(0.96);
+  transform-origin: 50% 48%;
+  animation: zixi-home-note-paper-in 0.54s cubic-bezier(0.2, 0.82, 0.22, 1) forwards;
+}
+.home-note-paper::before {
+  content: "";
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  width: 116px;
+  height: 34px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.38), rgba(255, 232, 160, 0.52));
+  box-shadow: 0 2px 8px rgba(95, 80, 72, 0.12);
+  transform: translateX(-50%) rotate(-1.2deg);
+}
+.home-note-paper::after {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  border: 1px solid rgba(130, 96, 64, 0.06);
+  pointer-events: none;
+}
+.home-note-paper p {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  font-family: "Segoe Print", "Bradley Hand ITC", "KaiTi", "STKaiti", "Comic Sans MS", cursive;
+  font-size: clamp(1.16rem, 4vw, 1.84rem);
+  font-weight: 600;
+  line-height: 1.85;
+  letter-spacing: 0;
+  text-align: left;
+  text-wrap: balance;
+}
+.home-note-paper p span {
+  display: block;
+}
+.home-note-intro.is-leaving {
+  pointer-events: none;
+  animation: zixi-gallery-note-overlay-out 0.82s ease-in forwards;
+}
+.home-note-intro.is-leaving .home-note-paper {
+  animation: zixi-home-note-paper-out 0.82s cubic-bezier(0.38, 0, 0.2, 1) forwards;
+}
+@keyframes zixi-home-note-paper-in {
+  from {
+    opacity: 0;
+    transform: rotate(4deg) translateY(18px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(1.8deg) translateY(0) scale(1);
+  }
+}
+@keyframes zixi-home-note-paper-out {
+  from {
+    opacity: 1;
+    filter: blur(0);
+    transform: rotate(1.8deg) translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    filter: blur(2px);
+    transform: rotate(-1deg) translateY(-8px) scale(1.22);
+  }
+}
+@media (max-width: 640px) {
+  .home-note-paper {
+    min-height: 220px;
+    transform: rotate(1.2deg) translateY(8px) scale(0.96);
+  }
+  .home-note-paper p {
+    line-height: 1.78;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-note-intro,
+  .home-note-paper,
+  .home-note-intro.is-leaving,
+  .home-note-intro.is-leaving .home-note-paper {
+    animation-duration: 1ms !important;
+  }
+}

@@ -21,8 +21,11 @@ let authListenerInitialized = false;
 let activePostContext = null;
 let galleryPreloadStarted = false;
 const galleryNoteIntroStorageKey = "ZIXI_GALLERY_NOTE_INTRO_SEEN";
+const homeNoteIntroStorageKey = "ZIXI_HOME_NOTE_INTRO_SEEN";
 let galleryNoteIntroTimer = null;
 let galleryNoteIntroCleanupTimer = null;
+let homeNoteIntroTimer = null;
+let homeNoteIntroCleanupTimer = null;
 
 function isGalleryPage() {
   return window.location.pathname.startsWith("/masonry");
@@ -133,6 +136,80 @@ function showGalleryNoteIntro(options = {}) {
     document.body.classList.remove("gallery-note-intro-active");
     ensureGalleryNoteButton();
   }, 7350);
+}
+function hasSeenHomeNoteIntro() {
+  try {
+    return sessionStorage.getItem(homeNoteIntroStorageKey) === "true";
+  } catch (error) {
+    return false;
+  }
+}
+
+function markHomeNoteIntroSeen() {
+  try {
+    sessionStorage.setItem(homeNoteIntroStorageKey, "true");
+  } catch (error) {}
+}
+
+function getHomeGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "早上好！";
+  if (hour < 18) return "下午好！";
+  return "晚上好！";
+}
+
+function clearHomeNoteIntro() {
+  window.clearTimeout(homeNoteIntroTimer);
+  window.clearTimeout(homeNoteIntroCleanupTimer);
+  homeNoteIntroTimer = null;
+  homeNoteIntroCleanupTimer = null;
+  document.querySelectorAll(".home-note-intro").forEach((element) => element.remove());
+  document.body.classList.remove("home-note-intro-active");
+}
+
+function createHomeNoteIntroOverlay() {
+  const overlay = document.createElement("div");
+  overlay.className = "home-note-intro";
+  overlay.setAttribute("aria-live", "polite");
+
+  const paper = document.createElement("div");
+  paper.className = "home-note-paper";
+  paper.setAttribute("role", "status");
+
+  const copy = document.createElement("p");
+  const greeting = document.createElement("span");
+  const welcome = document.createElement("span");
+  greeting.textContent = getHomeGreeting();
+  welcome.textContent = "欢迎到访 Zixi 的自留地";
+  copy.appendChild(greeting);
+  copy.appendChild(welcome);
+
+  paper.appendChild(copy);
+  overlay.appendChild(paper);
+  return overlay;
+}
+
+function showHomeNoteIntro() {
+  if (!isHomePage()) {
+    clearHomeNoteIntro();
+    return;
+  }
+
+  if (hasSeenHomeNoteIntro() || document.querySelector(".home-note-intro")) return;
+  markHomeNoteIntroSeen();
+
+  const overlay = createHomeNoteIntroOverlay();
+  document.body.appendChild(overlay);
+  document.body.classList.add("home-note-intro-active");
+
+  homeNoteIntroTimer = window.setTimeout(() => {
+    overlay.classList.add("is-leaving");
+  }, 5000);
+
+  homeNoteIntroCleanupTimer = window.setTimeout(() => {
+    overlay.remove();
+    document.body.classList.remove("home-note-intro-active");
+  }, 5850);
 }
 function canPreloadGallery() {
   const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
@@ -1473,6 +1550,7 @@ function initBlogInteractions() {
   scheduleGalleryPreload();
   showGalleryNoteIntro();
   showBirthdayCakeIntro();
+  showHomeNoteIntro();
   randomizeHomeHeroQuote();
   initAuth();
   initSiteGuestbook();
