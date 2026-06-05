@@ -47,7 +47,7 @@ function markGalleryNoteIntroSeen() {
   } catch (error) {}
 }
 
-const galleryNoteText = "\u7167\u7247\u5c31\u50cf\u662f\u4ece\u4e09\u7ef4\u4e16\u754c\u88c1\u4e0b\u4e86\u4e00\u5e27\uff0c\u5e26\u7ed9\u8fd9\u5239\u90a3\u7a7f\u8d8a\u65f6\u7a7a\u7684\u529b\u91cf~";
+const galleryNoteText = "摄影<br>就像是从这世界裁下了一帧<br>带给刹那穿越时空的力量~<br><span style=\"display: block; text-align: right;\">--Zixi</span>";
 
 function removeGalleryNoteButton() {
   document.querySelectorAll(".gallery-note-reopen").forEach((element) => element.remove());
