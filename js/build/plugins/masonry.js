@@ -1,4 +1,13 @@
 const galleryMasonryInstances = new WeakMap();
+const galleryLikeConfig = {
+  storageKey: "ZIXI_GALLERY_LIKE_COUNTS",
+  visitStorageKey: "ZIXI_GALLERY_VISIT_LIKES",
+  table: "gallery_likes",
+  supabaseUrl: "https://lfjmmzvabkpneglaevvi.supabase.co",
+  supabaseKey: "sb_publishable_H5yhsQ854nw7VJuQXS1EJg_PYdGaMyC",
+};
+let galleryLikeClientPromise = null;
+
 
 export function initMasonry() {
   var loadingPlaceholder = document.querySelector(".loading-placeholder");
@@ -122,8 +131,177 @@ export function initMasonry() {
     });
 
     shell.appendChild(img);
+    shell.appendChild(createGalleryLikeButton(file));
     item.appendChild(shell);
     return item;
+  }
+
+  function createGalleryLikeButton(file) {
+    var imageKey = getGalleryLikeImageKey(file);
+    var button = document.createElement("button");
+    button.className = "gallery-photo-like";
+    button.type = "button";
+    button.dataset.galleryLikeKey = imageKey;
+    button.setAttribute("aria-label", "\u4e3a\u8fd9\u5f20\u7167\u7247\u70b9\u8d5e");
+    button.setAttribute("aria-pressed", hasLikedGalleryImage(imageKey) ? "true" : "false");
+    button.innerHTML = '<i class="fa-solid fa-heart" aria-hidden="true"></i><span class="gallery-photo-like-count" role="status" aria-live="polite"></span>';
+    button.classList.toggle("is-liked", hasLikedGalleryImage(imageKey));
+
+    button.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      handleGalleryPhotoLike(button, imageKey);
+    });
+
+    return button;
+  }
+
+  function getGalleryLikeImageKey(file) {
+    var raw = file && (file.url || file.name) ? file.url || file.name : "unknown";
+    return String(raw).replace(/^https?:\/\/[^/]+/i, "").split("?")[0];
+  }
+
+  function readGalleryLikeCounts() {
+    try {
+      return JSON.parse(localStorage.getItem(galleryLikeConfig.storageKey) || "{}");
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function writeGalleryLikeCounts(counts) {
+    try {
+      localStorage.setItem(galleryLikeConfig.storageKey, JSON.stringify(counts));
+    } catch (error) {}
+  }
+
+  function readGalleryVisitLikes() {
+    try {
+      return JSON.parse(sessionStorage.getItem(galleryLikeConfig.visitStorageKey) || "{}");
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function writeGalleryVisitLikes(likes) {
+    try {
+      sessionStorage.setItem(galleryLikeConfig.visitStorageKey, JSON.stringify(likes));
+    } catch (error) {}
+  }
+
+  function hasLikedGalleryImage(imageKey) {
+    return readGalleryVisitLikes()[imageKey] === true;
+  }
+
+  function markGalleryImageLiked(imageKey) {
+    var likes = readGalleryVisitLikes();
+    likes[imageKey] = true;
+    writeGalleryVisitLikes(likes);
+  }
+
+  function incrementLocalGalleryLikeCount(imageKey) {
+    var counts = readGalleryLikeCounts();
+    counts[imageKey] = Math.max(0, Number(counts[imageKey]) || 0) + 1;
+    writeGalleryLikeCounts(counts);
+    return counts[imageKey];
+  }
+
+  function readLocalGalleryLikeCount(imageKey) {
+    var counts = readGalleryLikeCounts();
+    return Math.max(0, Number(counts[imageKey]) || 0);
+  }
+
+  function getGalleryLikeClient() {
+    if (!galleryLikeClientPromise) {
+      galleryLikeClientPromise = import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm")
+        .then(function (module) {
+          return module.createClient(galleryLikeConfig.supabaseUrl, galleryLikeConfig.supabaseKey, {
+            auth: { persistSession: false, autoRefreshToken: false },
+          });
+        });
+    }
+    return galleryLikeClientPromise;
+  }
+
+  function getGalleryVisitId() {
+    var key = "ZIXI_GALLERY_VISIT_ID";
+    var id = sessionStorage.getItem(key);
+    if (!id) {
+      id = window.crypto?.randomUUID?.() || String(Date.now()) + "-" + Math.random().toString(36).slice(2);
+      sessionStorage.setItem(key, id);
+    }
+    return id;
+  }
+
+  async function fetchGalleryLikeCount(imageKey) {
+    var supabase = await getGalleryLikeClient();
+    var result = await supabase
+      .from(galleryLikeConfig.table)
+      .select("id", { count: "exact", head: true })
+      .eq("image_key", imageKey);
+    if (result.error) throw result.error;
+    return result.count || 0;
+  }
+
+  async function persistGalleryLike(imageKey) {
+    var supabase = await getGalleryLikeClient();
+    var result = await supabase.from(galleryLikeConfig.table).insert({
+      image_key: imageKey,
+      visit_id: getGalleryVisitId(),
+    });
+    if (result.error) throw result.error;
+    return fetchGalleryLikeCount(imageKey);
+  }
+
+  function showGalleryLikeCount(button, count) {
+    var countNode = button.querySelector(".gallery-photo-like-count");
+    if (!countNode) return;
+    countNode.textContent = String(Math.max(0, Number(count) || 0));
+    button.classList.remove("is-count-visible");
+    void button.offsetWidth;
+    button.classList.add("is-count-visible");
+    clearTimeout(Number(button.dataset.countHideTimer) || 0);
+    button.dataset.countHideTimer = String(setTimeout(function () {
+      button.classList.remove("is-count-visible");
+    }, 1500));
+  }
+
+  function playGalleryLikeBurst(button) {
+    button.classList.remove("is-popping");
+    void button.offsetWidth;
+    button.classList.add("is-popping");
+    setTimeout(function () {
+      button.classList.remove("is-popping");
+    }, 520);
+  }
+
+  async function handleGalleryPhotoLike(button, imageKey) {
+    if (button.dataset.likeBusy === "true") return;
+
+    if (hasLikedGalleryImage(imageKey)) {
+      showGalleryLikeCount(button, Number(button.dataset.galleryLikeCount) || readLocalGalleryLikeCount(imageKey));
+      return;
+    }
+
+    button.dataset.likeBusy = "true";
+    markGalleryImageLiked(imageKey);
+    button.classList.add("is-liked");
+    button.setAttribute("aria-pressed", "true");
+    playGalleryLikeBurst(button);
+
+    var count = incrementLocalGalleryLikeCount(imageKey);
+    showGalleryLikeCount(button, count);
+
+    try {
+      count = await persistGalleryLike(imageKey);
+      button.dataset.galleryLikeCount = String(count);
+      showGalleryLikeCount(button, count);
+    } catch (error) {
+      console.warn("Gallery likes are using local fallback.", error);
+      button.dataset.galleryLikeCount = String(count);
+    } finally {
+      button.dataset.likeBusy = "false";
+    }
   }
 
   function waitForImageDecode(img) {
