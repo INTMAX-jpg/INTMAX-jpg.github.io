@@ -6784,10 +6784,13 @@ body.blog-auth-modal-open {
 }
 .blog-auth-github {
   width: 100%;
+  min-height: 56px;
   margin-top: 20px;
-  border: 1px solid var(--border-color);
-  background: var(--second-background-color);
+  border: 1px solid color-mix(in srgb, var(--primary-color) 28%, var(--border-color));
+  background: color-mix(in srgb, var(--second-background-color) 82%, var(--primary-color));
   color: var(--default-text-color);
+  font-size: 1rem;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--primary-color) 12%, transparent);
 }
 .blog-auth-github:hover {
   color: var(--primary-color);
@@ -6857,11 +6860,43 @@ body.blog-auth-modal-open {
   border-color: var(--primary-color);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 18%, transparent);
 }
+.blog-auth-account-hint {
+  color: var(--third-text-color);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.55;
+}
 .blog-auth-account-submit {
   width: 100%;
   border: 0;
   background: var(--primary-color);
   color: var(--background-color);
+}
+.blog-auth-forgot {
+  justify-self: center;
+  border: 0;
+  background: transparent;
+  color: var(--third-text-color);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+}
+.blog-auth-forgot:hover {
+  color: var(--primary-color);
+}
+.blog-auth-forgot-note {
+  justify-self: center;
+  max-width: 280px;
+  padding: 14px 16px;
+  border: 1px solid rgba(210, 170, 95, 0.4);
+  border-radius: 4px;
+  background: linear-gradient(145deg, #fff7d6, #f6e8ad);
+  color: #554625;
+  font-family: "Segoe Print", "Bradley Hand ITC", "KaiTi", "STKaiti", "Comic Sans MS", cursive;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.18);
+  transform: rotate(-1.5deg);
 }
 .blog-auth-email-status {
   min-height: 22px;

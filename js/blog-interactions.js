@@ -466,8 +466,7 @@ function injectAuthModal() {
       <div class="blog-auth-panel-header">
         <span class="blog-auth-panel-icon" aria-hidden="true"><i class="fa-regular fa-user"></i></span>
         <div>
-          <h2 id="blog-auth-title">\u767b\u5f55 & \u6ce8\u518c</h2>
-          <p>\u81ea\u5b9a\u4e49\u8d26\u53f7\u5373\u53ef\u4f7f\u7528\u3002\u8d26\u53f7\u53ef\u4ee5\u53c2\u8003\u90ae\u7bb1\u3001\u624b\u673a\u53f7\uff0c\u53ea\u8981\u548c\u522b\u4eba\u4e0d\u4e00\u6837\u5c31\u884c\u3002</p>
+          <h2 id="blog-auth-title">\u767b\u5f55/\u6ce8\u518c</h2>
         </div>
       </div>
       <button class="blog-auth-github" type="button">
@@ -481,18 +480,21 @@ function injectAuthModal() {
       </div>
       <form class="blog-auth-account-form" data-mode="login">
         <label>
-          <span>\u81ea\u5b9a\u4e49\u8d26\u53f7</span>
-          <input class="blog-auth-account" type="text" autocomplete="username" maxlength="80" placeholder="\u90ae\u7bb1 / \u624b\u673a\u53f7 / \u81ea\u5b9a\u4e49\u8d26\u53f7" required>
+          <span class="blog-auth-account-label">\u8d26\u53f7</span>
+          <input class="blog-auth-account" type="text" autocomplete="username" maxlength="80" placeholder="\u4e4b\u524d\u6ce8\u518c\u7684\u8d26\u53f7" required>
+          <small class="blog-auth-account-hint" hidden>\u81ea\u5b9a\u4e49\u8d26\u53f7\u5373\u53ef\u4f7f\u7528\u3002\u8d26\u53f7\u53ef\u4ee5\u53c2\u8003\u90ae\u7bb1\u3001\u624b\u673a\u53f7\uff0c\u53ea\u8981\u548c\u522b\u4eba\u4e0d\u4e00\u6837\u5c31\u884c\u3002</small>
         </label>
         <label>
           <span>\u5bc6\u7801</span>
-          <input class="blog-auth-password" type="password" autocomplete="current-password" minlength="6" placeholder="\u81f3\u5c11 6 \u4f4d" required>
+          <input class="blog-auth-password" type="password" autocomplete="current-password" minlength="6" placeholder="\u4e4b\u524d\u8bbe\u7f6e\u7684\u5bc6\u7801" required>
         </label>
         <label class="blog-auth-nickname-field" hidden>
           <span>\u6635\u79f0</span>
           <input class="blog-auth-display-name" type="text" autocomplete="nickname" maxlength="40" placeholder="\u663e\u793a\u5728\u8bc4\u8bba\u91cc\u7684\u540d\u5b57">
         </label>
         <button class="blog-auth-account-submit" type="submit">\u767b\u5f55</button>
+        <button class="blog-auth-forgot" type="button">\u5fd8\u8bb0\u5bc6\u7801\uff1f</button>
+        <div class="blog-auth-forgot-note" hidden>\u90a3\u5c31\u8054\u7cfb Zixi \u6216\u8005\u91cd\u65b0\u6ce8\u518c\u4e00\u4e2a\u8d26\u53f7\u53ed</div>
         <p class="blog-auth-email-status" role="status"></p>
       </form>
     </section>
@@ -506,6 +508,7 @@ function injectAuthModal() {
   modal.querySelectorAll(".blog-auth-tab").forEach((tab) => {
     tab.addEventListener("click", () => setAuthMode(tab.dataset.authMode || "login"));
   });
+  modal.querySelector(".blog-auth-forgot")?.addEventListener("click", showAuthForgotNote);
   modal.querySelector(".blog-auth-account-form")?.addEventListener("submit", (event) => {
     event.preventDefault();
     const mode = event.currentTarget.dataset.mode || "login";
@@ -541,18 +544,39 @@ function setAuthMode(mode) {
   const submit = document.querySelector(".blog-auth-account-submit");
   const nicknameField = document.querySelector(".blog-auth-nickname-field");
   const password = document.querySelector(".blog-auth-password");
+  const account = document.querySelector(".blog-auth-account");
+  const accountLabel = document.querySelector(".blog-auth-account-label");
+  const accountHint = document.querySelector(".blog-auth-account-hint");
+  const forgot = document.querySelector(".blog-auth-forgot");
+  const forgotNote = document.querySelector(".blog-auth-forgot-note");
   const normalizedMode = mode === "signup" ? "signup" : "login";
+  const isSignup = normalizedMode === "signup";
 
   if (form) form.dataset.mode = normalizedMode;
-  if (submit) submit.textContent = normalizedMode === "signup" ? "\u5b8c\u6210\u6ce8\u518c" : "\u767b\u5f55";
-  if (nicknameField) nicknameField.hidden = normalizedMode !== "signup";
-  if (password) password.autocomplete = normalizedMode === "signup" ? "new-password" : "current-password";
+  if (submit) submit.textContent = isSignup ? "\u5b8c\u6210\u6ce8\u518c" : "\u767b\u5f55";
+  if (nicknameField) nicknameField.hidden = !isSignup;
+  if (password) {
+    password.autocomplete = isSignup ? "new-password" : "current-password";
+    password.placeholder = isSignup ? "\u81f3\u5c11 6 \u4f4d" : "\u4e4b\u524d\u8bbe\u7f6e\u7684\u5bc6\u7801";
+  }
+  if (account) account.placeholder = isSignup ? "\u90ae\u7bb1 / \u624b\u673a\u53f7 / \u81ea\u5b9a\u4e49\u8d26\u53f7" : "\u4e4b\u524d\u6ce8\u518c\u7684\u8d26\u53f7";
+  if (accountLabel) accountLabel.textContent = isSignup ? "\u81ea\u5b9a\u4e49\u8d26\u53f7" : "\u8d26\u53f7";
+  if (accountHint) accountHint.hidden = !isSignup;
+  if (forgot) forgot.hidden = isSignup;
+  if (forgotNote) forgotNote.hidden = true;
   document.querySelectorAll(".blog-auth-tab").forEach((tab) => {
     const isActive = tab.dataset.authMode === normalizedMode;
     tab.classList.toggle("is-active", isActive);
     tab.setAttribute("aria-selected", isActive ? "true" : "false");
   });
   setAuthEmailStatus("");
+}
+
+function showAuthForgotNote() {
+  const note = document.querySelector(".blog-auth-forgot-note");
+  if (!note) return;
+
+  note.hidden = false;
 }
 
 function setAuthEmailStatus(message, isError = false) {
