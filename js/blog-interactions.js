@@ -460,38 +460,39 @@ function injectAuthModal() {
   modal.innerHTML = `
     <div class="blog-auth-modal-backdrop" data-auth-close></div>
     <section class="blog-auth-panel" role="dialog" aria-modal="true" aria-labelledby="blog-auth-title">
-      <button class="blog-auth-close" type="button" data-auth-close aria-label="关闭登录窗口">
+      <button class="blog-auth-close" type="button" data-auth-close aria-label="\u5173\u95ed\u767b\u5f55\u7a97\u53e3">
         <i class="fa-solid fa-xmark" aria-hidden="true"></i>
       </button>
       <div class="blog-auth-panel-header">
-        <span class="blog-auth-panel-icon" aria-hidden="true"><i class="fa-regular fa-envelope"></i></span>
+        <span class="blog-auth-panel-icon" aria-hidden="true"><i class="fa-regular fa-user"></i></span>
         <div>
-          <h2 id="blog-auth-title">登录 Zixi 的自留地</h2>
-          <p>支持 GitHub，也支持邮箱注册和验证。</p>
+          <h2 id="blog-auth-title">\u767b\u5f55 & \u6ce8\u518c</h2>
+          <p>\u81ea\u5b9a\u4e49\u8d26\u53f7\u5373\u53ef\u4f7f\u7528\u3002\u8d26\u53f7\u53ef\u4ee5\u53c2\u8003\u90ae\u7bb1\u3001\u624b\u673a\u53f7\uff0c\u53ea\u8981\u548c\u522b\u4eba\u4e0d\u4e00\u6837\u5c31\u884c\u3002</p>
         </div>
       </div>
       <button class="blog-auth-github" type="button">
         <i class="fa-brands fa-github" aria-hidden="true"></i>
-        <span>使用 GitHub 登录</span>
+        <span>\u4f7f\u7528 GitHub \u767b\u5f55</span>
       </button>
-      <div class="blog-auth-divider"><span>或使用邮箱</span></div>
-      <form class="blog-auth-email-form">
+      <div class="blog-auth-divider"><span>\u6216\u4f7f\u7528\u81ea\u5b9a\u4e49\u8d26\u53f7</span></div>
+      <div class="blog-auth-tabs" role="tablist" aria-label="\u767b\u5f55\u6216\u6ce8\u518c">
+        <button class="blog-auth-tab is-active" type="button" data-auth-mode="login" role="tab" aria-selected="true">\u767b\u5f55</button>
+        <button class="blog-auth-tab" type="button" data-auth-mode="signup" role="tab" aria-selected="false">\u6ce8\u518c</button>
+      </div>
+      <form class="blog-auth-account-form" data-mode="login">
         <label>
-          <span>邮箱</span>
-          <input class="blog-auth-email" type="email" autocomplete="email" inputmode="email" placeholder="name@example.com" required>
+          <span>\u81ea\u5b9a\u4e49\u8d26\u53f7</span>
+          <input class="blog-auth-account" type="text" autocomplete="username" maxlength="80" placeholder="\u90ae\u7bb1 / \u624b\u673a\u53f7 / \u81ea\u5b9a\u4e49\u8d26\u53f7" required>
         </label>
         <label>
-          <span>密码</span>
-          <input class="blog-auth-password" type="password" autocomplete="current-password" minlength="6" placeholder="至少 6 位" required>
+          <span>\u5bc6\u7801</span>
+          <input class="blog-auth-password" type="password" autocomplete="current-password" minlength="6" placeholder="\u81f3\u5c11 6 \u4f4d" required>
         </label>
-        <label>
-          <span>昵称（注册时可填）</span>
-          <input class="blog-auth-display-name" type="text" autocomplete="nickname" maxlength="40" placeholder="访客昵称">
+        <label class="blog-auth-nickname-field" hidden>
+          <span>\u6635\u79f0</span>
+          <input class="blog-auth-display-name" type="text" autocomplete="nickname" maxlength="40" placeholder="\u663e\u793a\u5728\u8bc4\u8bba\u91cc\u7684\u540d\u5b57">
         </label>
-        <div class="blog-auth-email-actions">
-          <button class="blog-auth-email-login" type="submit">邮箱登录</button>
-          <button class="blog-auth-email-signup" type="button">注册并发送验证邮件</button>
-        </div>
+        <button class="blog-auth-account-submit" type="submit">\u767b\u5f55</button>
         <p class="blog-auth-email-status" role="status"></p>
       </form>
     </section>
@@ -502,21 +503,29 @@ function injectAuthModal() {
     node.addEventListener("click", closeAuthModal);
   });
   modal.querySelector(".blog-auth-github")?.addEventListener("click", signInWithGitHub);
-  modal.querySelector(".blog-auth-email-form")?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    signInWithEmail();
+  modal.querySelectorAll(".blog-auth-tab").forEach((tab) => {
+    tab.addEventListener("click", () => setAuthMode(tab.dataset.authMode || "login"));
   });
-  modal.querySelector(".blog-auth-email-signup")?.addEventListener("click", signUpWithEmail);
+  modal.querySelector(".blog-auth-account-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const mode = event.currentTarget.dataset.mode || "login";
+    if (mode === "signup") {
+      signUpWithAccount();
+    } else {
+      signInWithAccount();
+    }
+  });
 }
 
-function openAuthModal() {
+function openAuthModal(mode = "login") {
   injectAuthModal();
+  setAuthMode(mode);
   const modal = document.querySelector(".blog-auth-modal");
   if (!modal) return;
 
   modal.hidden = false;
   document.body.classList.add("blog-auth-modal-open");
-  modal.querySelector(".blog-auth-email")?.focus();
+  modal.querySelector(".blog-auth-account")?.focus();
 }
 
 function closeAuthModal() {
@@ -527,6 +536,25 @@ function closeAuthModal() {
   document.body.classList.remove("blog-auth-modal-open");
 }
 
+function setAuthMode(mode) {
+  const form = document.querySelector(".blog-auth-account-form");
+  const submit = document.querySelector(".blog-auth-account-submit");
+  const nicknameField = document.querySelector(".blog-auth-nickname-field");
+  const password = document.querySelector(".blog-auth-password");
+  const normalizedMode = mode === "signup" ? "signup" : "login";
+
+  if (form) form.dataset.mode = normalizedMode;
+  if (submit) submit.textContent = normalizedMode === "signup" ? "\u5b8c\u6210\u6ce8\u518c" : "\u767b\u5f55";
+  if (nicknameField) nicknameField.hidden = normalizedMode !== "signup";
+  if (password) password.autocomplete = normalizedMode === "signup" ? "new-password" : "current-password";
+  document.querySelectorAll(".blog-auth-tab").forEach((tab) => {
+    const isActive = tab.dataset.authMode === normalizedMode;
+    tab.classList.toggle("is-active", isActive);
+    tab.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+  setAuthEmailStatus("");
+}
+
 function setAuthEmailStatus(message, isError = false) {
   const status = document.querySelector(".blog-auth-email-status");
   if (!status) return;
@@ -535,34 +563,69 @@ function setAuthEmailStatus(message, isError = false) {
   status.classList.toggle("is-error", isError);
 }
 
-function getAuthEmailFormValues() {
-  const email = document.querySelector(".blog-auth-email")?.value.trim() || "";
+function normalizeCustomAccount(account) {
+  return account.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function accountToInternalEmail(account) {
+  const bytes = new TextEncoder().encode(account);
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  const encoded = btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  return `u_${encoded}@zixi.local`;
+}
+
+function getAuthAccountFormValues(requireNickname = false) {
+  const rawAccount = document.querySelector(".blog-auth-account")?.value || "";
+  const account = normalizeCustomAccount(rawAccount);
   const password = document.querySelector(".blog-auth-password")?.value || "";
   const displayName = document.querySelector(".blog-auth-display-name")?.value.trim() || "";
 
-  if (!email || !password) {
-    setAuthEmailStatus("请填写邮箱和密码。", true);
+  if (!account || !password) {
+    setAuthEmailStatus("\u8bf7\u586b\u5199\u8d26\u53f7\u548c\u5bc6\u7801\u3002", true);
+    return null;
+  }
+
+  if (account.length < 3 || account.length > 80) {
+    setAuthEmailStatus("\u8d26\u53f7\u957f\u5ea6\u9700\u8981\u5728 3 \u5230 80 \u4e2a\u5b57\u7b26\u4e4b\u95f4\u3002", true);
+    return null;
+  }
+
+  if (!/^[\p{L}\p{N}@._+\-\s]+$/u.test(account)) {
+    setAuthEmailStatus("\u8d26\u53f7\u53ea\u80fd\u5305\u542b\u6587\u5b57\u3001\u6570\u5b57\u3001\u7a7a\u683c\u3001@\u3001\u70b9\u3001\u4e0b\u5212\u7ebf\u3001\u52a0\u53f7\u6216\u77ed\u6a2a\u7ebf\u3002", true);
     return null;
   }
 
   if (password.length < 6) {
-    setAuthEmailStatus("密码至少需要 6 位。", true);
+    setAuthEmailStatus("\u5bc6\u7801\u81f3\u5c11\u9700\u8981 6 \u4f4d\u3002", true);
     return null;
   }
 
-  return { email, password, displayName };
+  if (requireNickname && !displayName) {
+    setAuthEmailStatus("\u6ce8\u518c\u65f6\u8bf7\u8bbe\u7f6e\u4e00\u4e2a\u6635\u79f0\u3002", true);
+    return null;
+  }
+
+  return {
+    account,
+    password,
+    displayName: displayName || account,
+    internalEmail: accountToInternalEmail(account),
+  };
 }
 
-async function signInWithEmail() {
-  const values = getAuthEmailFormValues();
+async function signInWithAccount() {
+  const values = getAuthAccountFormValues(false);
   if (!values) return;
 
-  setAuthEmailStatus("正在登录...");
+  setAuthEmailStatus("\u6b63\u5728\u767b\u5f55...");
 
   try {
     const supabase = await getSupabaseClient();
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: values.email,
+      email: values.internalEmail,
       password: values.password,
     });
 
@@ -570,45 +633,51 @@ async function signInWithEmail() {
 
     currentSession = data.session;
     updateAuthUI(currentSession);
-    setAuthEmailStatus("登录成功。");
+    setAuthEmailStatus("\u767b\u5f55\u6210\u529f\u3002");
     setTimeout(closeAuthModal, 450);
   } catch (error) {
-    console.warn("Email 登录失败", error);
-    setAuthEmailStatus("登录失败。请确认邮箱已验证，且密码正确。", true);
+    console.warn("Custom account sign-in failed", error);
+    setAuthEmailStatus("\u767b\u5f55\u5931\u8d25\u3002\u8bf7\u786e\u8ba4\u8d26\u53f7\u548c\u5bc6\u7801\u6b63\u786e\u3002", true);
   }
 }
 
-async function signUpWithEmail() {
-  const values = getAuthEmailFormValues();
+async function signUpWithAccount() {
+  const values = getAuthAccountFormValues(true);
   if (!values) return;
 
-  setAuthEmailStatus("正在发送验证邮件...");
+  setAuthEmailStatus("\u6b63\u5728\u6ce8\u518c...");
 
   try {
     const supabase = await getSupabaseClient();
     const { data, error } = await supabase.auth.signUp({
-      email: values.email,
+      email: values.internalEmail,
       password: values.password,
       options: {
-        emailRedirectTo: getAuthRedirectUrl(),
-        data: values.displayName ? { name: values.displayName } : {},
+        data: {
+          name: values.displayName,
+          account_name: values.account,
+          auth_method: "custom_account",
+        },
       },
     });
 
     if (error) throw error;
 
-    if (data.session) {
-      currentSession = data.session;
-      updateAuthUI(currentSession);
-      setAuthEmailStatus("注册成功，已自动登录。");
-      setTimeout(closeAuthModal, 450);
+    if (!data.session) {
+      setAuthEmailStatus("\u6ce8\u518c\u8bf7\u6c42\u5df2\u63d0\u4ea4\uff0c\u4f46 Supabase \u4ecd\u8981\u6c42\u90ae\u7bb1\u9a8c\u8bc1\u3002\u8bf7\u5728\u540e\u53f0\u5173\u95ed Confirm email\u3002", true);
       return;
     }
 
-    setAuthEmailStatus("验证邮件已发送。请到邮箱中点击确认链接后再登录。");
+    currentSession = data.session;
+    updateAuthUI(currentSession);
+    setAuthEmailStatus("\u6ce8\u518c\u6210\u529f\uff0c\u5df2\u81ea\u52a8\u767b\u5f55\u3002");
+    setTimeout(closeAuthModal, 450);
   } catch (error) {
-    console.warn("Email 注册失败", error);
-    setAuthEmailStatus("注册失败。请确认 Supabase 已开启 Email provider，并检查邮箱是否可接收验证邮件。", true);
+    console.warn("Custom account sign-up failed", error);
+    const message = /already|registered|exists/i.test(error?.message || "")
+      ? "\u8fd9\u4e2a\u8d26\u53f7\u5df2\u7ecf\u88ab\u4f7f\u7528\uff0c\u8bf7\u6362\u4e00\u4e2a\u3002"
+      : "\u6ce8\u518c\u5931\u8d25\u3002\u8bf7\u786e\u8ba4\u8d26\u53f7\u672a\u88ab\u5360\u7528\uff0c\u5e76\u4e14 Supabase \u5df2\u5173\u95ed\u90ae\u7bb1\u9a8c\u8bc1\u3002";
+    setAuthEmailStatus(message, true);
   }
 }
 

@@ -6771,8 +6771,8 @@ body.blog-auth-modal-open {
   line-height: 1.55;
 }
 .blog-auth-github,
-.blog-auth-email-login,
-.blog-auth-email-signup {
+.blog-auth-tab,
+.blog-auth-account-submit {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -6809,18 +6809,40 @@ body.blog-auth-modal-open {
   flex: 1;
   background: var(--border-color);
 }
-.blog-auth-email-form {
+.blog-auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding: 4px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--second-background-color);
+}
+.blog-auth-tab {
+  min-height: 36px;
+  border: 0;
+  background: transparent;
+  color: var(--third-text-color);
+  font: inherit;
+}
+.blog-auth-tab.is-active {
+  background: var(--background-color);
+  color: var(--primary-color);
+  box-shadow: var(--redefine-box-shadow-flat);
+}
+.blog-auth-account-form {
   display: grid;
   gap: 12px;
 }
-.blog-auth-email-form label {
+.blog-auth-account-form label {
   display: grid;
   gap: 6px;
   color: var(--second-text-color);
   font-size: 0.86rem;
   font-weight: 650;
 }
-.blog-auth-email-form input {
+.blog-auth-account-form input {
   width: 100%;
   min-height: 42px;
   padding: 0 12px;
@@ -6831,29 +6853,15 @@ body.blog-auth-modal-open {
   color: var(--default-text-color);
   font: inherit;
 }
-.blog-auth-email-form input:focus {
+.blog-auth-account-form input:focus {
   border-color: var(--primary-color);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 18%, transparent);
 }
-.blog-auth-email-actions {
-  display: grid;
-  grid-template-columns: 1fr 1.35fr;
-  gap: 10px;
-  margin-top: 2px;
-}
-.blog-auth-email-login {
+.blog-auth-account-submit {
+  width: 100%;
   border: 0;
   background: var(--primary-color);
   color: var(--background-color);
-}
-.blog-auth-email-signup {
-  border: 1px solid var(--border-color);
-  background: transparent;
-  color: var(--second-text-color);
-}
-.blog-auth-email-signup:hover {
-  color: var(--primary-color);
-  border-color: var(--primary-color);
 }
 .blog-auth-email-status {
   min-height: 22px;
@@ -6867,9 +6875,6 @@ body.blog-auth-modal-open {
 @media (max-width: 520px) {
   .blog-auth-panel {
     padding: 18px;
-  }
-  .blog-auth-email-actions {
-    grid-template-columns: 1fr;
   }
 }
 
