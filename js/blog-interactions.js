@@ -392,7 +392,7 @@ function getSupabaseClient() {
 
 function getUserDisplayName(user) {
   if (!user) return "";
-  return user.user_metadata?.user_name || user.user_metadata?.preferred_username || user.user_metadata?.name || user.email || "GitHub User";
+  return user.user_metadata?.user_name || user.user_metadata?.preferred_username || user.user_metadata?.name || user.email || "Email User";
 }
 
 function getUserAvatar(user) {
@@ -423,6 +423,8 @@ function createAuthControlItem(className) {
 }
 
 function injectAuthControls() {
+  injectAuthModal();
+
   const navbarList = document.querySelector(".navbar-list");
   if (navbarList && !document.querySelector(".blog-auth-nav")) {
     navbarList.appendChild(createAuthControlItem("navbar-item blog-auth-nav"));
@@ -442,7 +444,172 @@ async function handleAuthButtonClick(event) {
     return;
   }
 
-  await signInWithGitHub();
+  openAuthModal();
+}
+
+function getAuthRedirectUrl() {
+  return window.location.href.split("#")[0];
+}
+
+function injectAuthModal() {
+  if (document.querySelector(".blog-auth-modal")) return;
+
+  const modal = document.createElement("div");
+  modal.className = "blog-auth-modal";
+  modal.hidden = true;
+  modal.innerHTML = `
+    <div class="blog-auth-modal-backdrop" data-auth-close></div>
+    <section class="blog-auth-panel" role="dialog" aria-modal="true" aria-labelledby="blog-auth-title">
+      <button class="blog-auth-close" type="button" data-auth-close aria-label="关闭登录窗口">
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+      </button>
+      <div class="blog-auth-panel-header">
+        <span class="blog-auth-panel-icon" aria-hidden="true"><i class="fa-regular fa-envelope"></i></span>
+        <div>
+          <h2 id="blog-auth-title">登录 Zixi 的自留地</h2>
+          <p>支持 GitHub，也支持邮箱注册和验证。</p>
+        </div>
+      </div>
+      <button class="blog-auth-github" type="button">
+        <i class="fa-brands fa-github" aria-hidden="true"></i>
+        <span>使用 GitHub 登录</span>
+      </button>
+      <div class="blog-auth-divider"><span>或使用邮箱</span></div>
+      <form class="blog-auth-email-form">
+        <label>
+          <span>邮箱</span>
+          <input class="blog-auth-email" type="email" autocomplete="email" inputmode="email" placeholder="name@example.com" required>
+        </label>
+        <label>
+          <span>密码</span>
+          <input class="blog-auth-password" type="password" autocomplete="current-password" minlength="6" placeholder="至少 6 位" required>
+        </label>
+        <label>
+          <span>昵称（注册时可填）</span>
+          <input class="blog-auth-display-name" type="text" autocomplete="nickname" maxlength="40" placeholder="访客昵称">
+        </label>
+        <div class="blog-auth-email-actions">
+          <button class="blog-auth-email-login" type="submit">邮箱登录</button>
+          <button class="blog-auth-email-signup" type="button">注册并发送验证邮件</button>
+        </div>
+        <p class="blog-auth-email-status" role="status"></p>
+      </form>
+    </section>
+  `;
+
+  document.body.appendChild(modal);
+  modal.querySelectorAll("[data-auth-close]").forEach((node) => {
+    node.addEventListener("click", closeAuthModal);
+  });
+  modal.querySelector(".blog-auth-github")?.addEventListener("click", signInWithGitHub);
+  modal.querySelector(".blog-auth-email-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    signInWithEmail();
+  });
+  modal.querySelector(".blog-auth-email-signup")?.addEventListener("click", signUpWithEmail);
+}
+
+function openAuthModal() {
+  injectAuthModal();
+  const modal = document.querySelector(".blog-auth-modal");
+  if (!modal) return;
+
+  modal.hidden = false;
+  document.body.classList.add("blog-auth-modal-open");
+  modal.querySelector(".blog-auth-email")?.focus();
+}
+
+function closeAuthModal() {
+  const modal = document.querySelector(".blog-auth-modal");
+  if (!modal) return;
+
+  modal.hidden = true;
+  document.body.classList.remove("blog-auth-modal-open");
+}
+
+function setAuthEmailStatus(message, isError = false) {
+  const status = document.querySelector(".blog-auth-email-status");
+  if (!status) return;
+
+  status.textContent = message;
+  status.classList.toggle("is-error", isError);
+}
+
+function getAuthEmailFormValues() {
+  const email = document.querySelector(".blog-auth-email")?.value.trim() || "";
+  const password = document.querySelector(".blog-auth-password")?.value || "";
+  const displayName = document.querySelector(".blog-auth-display-name")?.value.trim() || "";
+
+  if (!email || !password) {
+    setAuthEmailStatus("请填写邮箱和密码。", true);
+    return null;
+  }
+
+  if (password.length < 6) {
+    setAuthEmailStatus("密码至少需要 6 位。", true);
+    return null;
+  }
+
+  return { email, password, displayName };
+}
+
+async function signInWithEmail() {
+  const values = getAuthEmailFormValues();
+  if (!values) return;
+
+  setAuthEmailStatus("正在登录...");
+
+  try {
+    const supabase = await getSupabaseClient();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: values.email,
+      password: values.password,
+    });
+
+    if (error) throw error;
+
+    currentSession = data.session;
+    updateAuthUI(currentSession);
+    setAuthEmailStatus("登录成功。");
+    setTimeout(closeAuthModal, 450);
+  } catch (error) {
+    console.warn("Email 登录失败", error);
+    setAuthEmailStatus("登录失败。请确认邮箱已验证，且密码正确。", true);
+  }
+}
+
+async function signUpWithEmail() {
+  const values = getAuthEmailFormValues();
+  if (!values) return;
+
+  setAuthEmailStatus("正在发送验证邮件...");
+
+  try {
+    const supabase = await getSupabaseClient();
+    const { data, error } = await supabase.auth.signUp({
+      email: values.email,
+      password: values.password,
+      options: {
+        emailRedirectTo: getAuthRedirectUrl(),
+        data: values.displayName ? { name: values.displayName } : {},
+      },
+    });
+
+    if (error) throw error;
+
+    if (data.session) {
+      currentSession = data.session;
+      updateAuthUI(currentSession);
+      setAuthEmailStatus("注册成功，已自动登录。");
+      setTimeout(closeAuthModal, 450);
+      return;
+    }
+
+    setAuthEmailStatus("验证邮件已发送。请到邮箱中点击确认链接后再登录。");
+  } catch (error) {
+    console.warn("Email 注册失败", error);
+    setAuthEmailStatus("注册失败。请确认 Supabase 已开启 Email provider，并检查邮箱是否可接收验证邮件。", true);
+  }
 }
 
 async function signInWithGitHub() {
@@ -450,7 +617,7 @@ async function signInWithGitHub() {
   await supabase.auth.signInWithOAuth({
     provider: "github",
     options: {
-      redirectTo: window.location.href.split("#")[0],
+      redirectTo: getAuthRedirectUrl(),
       scopes: "read:user user:email",
     },
   });
@@ -747,7 +914,7 @@ function renderCommentArea(context, force = false) {
       <div class="blog-comment-card-header">
         <div>
           <div class="blog-comment-eyebrow">Supabase Auth</div>
-          <div class="blog-comment-title">用 GitHub 身份参与讨论</div>
+          <div class="blog-comment-title">用 GitHub 或邮箱身份参与讨论</div>
         </div>
         ${user ? `
           <div class="supabase-comment-user">
@@ -756,13 +923,13 @@ function renderCommentArea(context, force = false) {
           </div>
         ` : `
           <button class="blog-comment-open supabase-comment-login" type="button">
-            <i class="fa-brands fa-github"></i>
-            <span>GitHub 登录</span>
+            <i class="fa-regular fa-user"></i>
+            <span>登录 / 注册</span>
           </button>
         `}
       </div>
       <p class="blog-comment-note">
-        ${user ? "当前评论会使用你的 GitHub 昵称和头像。" : "请先登录 GitHub，再发布评论。登录状态会与顶部导航栏同步。"}
+        ${user ? "当前评论会使用你的登录昵称和头像。" : "请先登录，再发布评论。登录状态会与顶部导航栏同步。"}
       </p>
       <div class="supabase-comment-composer" ${user ? "" : "hidden"}>
         <textarea class="supabase-comment-input" maxlength="1000" rows="4" placeholder="写下你的想法..."></textarea>
@@ -780,7 +947,7 @@ function renderCommentArea(context, force = false) {
   `;
 
   const loginButton = container.querySelector(".supabase-comment-login");
-  if (loginButton) loginButton.addEventListener("click", signInWithGitHub);
+  if (loginButton) loginButton.addEventListener("click", openAuthModal);
 
   const submitButton = container.querySelector(".supabase-comment-submit");
   if (submitButton) {
@@ -840,7 +1007,7 @@ async function submitSupabaseComment(context) {
   const submitButton = document.querySelector(".supabase-comment-submit");
 
   if (!user) {
-    await signInWithGitHub();
+    openAuthModal();
     return;
   }
 
@@ -1385,10 +1552,10 @@ function renderGuestbookModalUser() {
   const user = getCurrentGuestbookUser();
   if (!user) {
     line.innerHTML = `
-      <span>需要先登录 GitHub 才能发送留言。</span>
-      <button class="blog-comment-open" type="button">GitHub 登录</button>
+      <span>需要先登录才能发送留言。</span>
+      <button class="blog-comment-open" type="button">登录 / 注册</button>
     `;
-    line.querySelector("button").addEventListener("click", signInWithGitHub);
+    line.querySelector("button").addEventListener("click", openAuthModal);
     return;
   }
 
@@ -1419,8 +1586,8 @@ async function submitSiteComment(parentId) {
     : document.querySelector(".guestbook-status");
 
   if (!user) {
-    if (status) status.textContent = "请先登录 GitHub。";
-    await signInWithGitHub();
+    if (status) status.textContent = "请先登录。";
+    openAuthModal();
     return;
   }
 
@@ -1598,7 +1765,7 @@ async function renderGuestbookHistory() {
 async function toggleSiteCommentLike(commentId) {
   const user = getCurrentGuestbookUser();
   if (!user) {
-    await signInWithGitHub();
+    openAuthModal();
     return;
   }
 
