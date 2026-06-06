@@ -191,11 +191,12 @@ function markHomeNoteIntroSeen() {
   } catch (error) {}
 }
 
-function getHomeGreeting() {
+function getHomeNoteLines() {
   const hour = new Date().getHours();
-  if (hour < 12) return "早上好！";
-  if (hour < 18) return "下午好！";
-  return "晚上好！";
+  if (hour < 4) return ["\u591c\u6df1\u4e86\uff0c\u770b\u4e9b\u6587\u5b57\u52a9\u7720\uff0c\u65e9\u4e9b\u4f11\u606f"];
+  if (hour < 12) return ["\u65e9\u4e0a\u597d\uff01", "\u6b22\u8fce\u5230\u8bbf Zixi \u7684\u81ea\u7559\u5730"];
+  if (hour < 18) return ["\u4e0b\u5348\u597d\uff01", "\u6b22\u8fce\u5230\u8bbf Zixi \u7684\u81ea\u7559\u5730"];
+  return ["\u665a\u4e0a\u597d\uff01", "\u6b22\u8fce\u5230\u8bbf Zixi \u7684\u81ea\u7559\u5730"];
 }
 
 function preventHomeNoteScroll(event) {
@@ -267,12 +268,11 @@ function createHomeNoteIntroOverlay() {
   paper.setAttribute("role", "status");
 
   const copy = document.createElement("p");
-  const greeting = document.createElement("span");
-  const welcome = document.createElement("span");
-  greeting.textContent = getHomeGreeting();
-  welcome.textContent = "欢迎到访 Zixi 的自留地";
-  copy.appendChild(greeting);
-  copy.appendChild(welcome);
+  getHomeNoteLines().forEach((line) => {
+    const span = document.createElement("span");
+    span.textContent = line;
+    copy.appendChild(span);
+  });
 
   paper.appendChild(copy);
   overlay.appendChild(paper);
