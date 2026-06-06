@@ -169,6 +169,8 @@ export function initMasonry() {
   var layoutObserver = null;
   var currentBaseWidth = 0;
   var renderAuditTimers = [];
+  var likeCountsHydrationPromise = null;
+  var likeCountsHydrationTimer = null;
 
   var existingInstance = galleryMasonryInstances.get(masonryContainer);
   if (existingInstance) {
@@ -206,6 +208,7 @@ export function initMasonry() {
     }
 
     pumpLoadingQueue();
+    scheduleGalleryLikeCountHydration(160);
   }
 
   function loadGalleryImages() {
@@ -234,6 +237,8 @@ export function initMasonry() {
 
       masonryContainer.appendChild(fragment);
       masonryContainer.dataset.galleryLoaded = "true";
+      primeGalleryLikeCountsFromLocal();
+      scheduleGalleryLikeCountHydration(260);
     });
   }
 
@@ -340,16 +345,90 @@ export function initMasonry() {
     writeGalleryVisitLikes(likes);
   }
 
-  function incrementLocalGalleryLikeCount(imageKey) {
-    var counts = readGalleryLikeCounts();
-    counts[imageKey] = Math.max(0, Number(counts[imageKey]) || 0) + 1;
-    writeGalleryLikeCounts(counts);
-    return counts[imageKey];
-  }
-
   function readLocalGalleryLikeCount(imageKey) {
     var counts = readGalleryLikeCounts();
     return Math.max(0, Number(counts[imageKey]) || 0);
+  }
+
+  function writeLocalGalleryLikeCount(imageKey, count) {
+    var counts = readGalleryLikeCounts();
+    counts[imageKey] = Math.max(0, Number(count) || 0);
+    writeGalleryLikeCounts(counts);
+  }
+
+  function getGalleryLikeButtons() {
+    return Array.prototype.slice.call(masonryContainer.querySelectorAll(".gallery-photo-like[data-gallery-like-key]"));
+  }
+
+  function setGalleryLikeButtonCount(button, count) {
+    var value = Math.max(0, Number(count) || 0);
+    button.dataset.galleryLikeCount = String(value);
+  }
+
+  function primeGalleryLikeCountsFromLocal() {
+    getGalleryLikeButtons().forEach(function (button) {
+      setGalleryLikeButtonCount(button, readLocalGalleryLikeCount(button.dataset.galleryLikeKey));
+    });
+  }
+
+  function scheduleGalleryLikeCountHydration(delay) {
+    clearTimeout(likeCountsHydrationTimer);
+    likeCountsHydrationTimer = setTimeout(function () {
+      hydrateGalleryLikeCounts();
+    }, delay || 0);
+  }
+
+  async function hydrateGalleryLikeCounts() {
+    if (likeCountsHydrationPromise) return likeCountsHydrationPromise;
+
+    var buttons = getGalleryLikeButtons();
+    var imageKeys = Array.from(new Set(buttons.map(function (button) {
+      return button.dataset.galleryLikeKey;
+    }).filter(Boolean)));
+
+    if (!imageKeys.length) return Promise.resolve({});
+
+    primeGalleryLikeCountsFromLocal();
+
+    likeCountsHydrationPromise = getGalleryLikeClient()
+      .then(function (supabase) {
+        return supabase
+          .from(galleryLikeConfig.table)
+          .select("image_key")
+          .in("image_key", imageKeys)
+          .range(0, 9999);
+      })
+      .then(function (result) {
+        if (result.error) throw result.error;
+
+        var counts = {};
+        imageKeys.forEach(function (imageKey) {
+          counts[imageKey] = 0;
+        });
+        (result.data || []).forEach(function (row) {
+          if (!row || !row.image_key) return;
+          counts[row.image_key] = (counts[row.image_key] || 0) + 1;
+        });
+
+        buttons.forEach(function (button) {
+          var imageKey = button.dataset.galleryLikeKey;
+          var count = counts[imageKey] || 0;
+          setGalleryLikeButtonCount(button, count);
+          writeLocalGalleryLikeCount(imageKey, count);
+        });
+
+        return counts;
+      })
+      .catch(function (error) {
+        console.warn("Gallery like counts are using local fallback.", error);
+        primeGalleryLikeCountsFromLocal();
+        return {};
+      })
+      .finally(function () {
+        likeCountsHydrationPromise = null;
+      });
+
+    return likeCountsHydrationPromise;
   }
 
   function getGalleryLikeClient() {
@@ -428,6 +507,7 @@ export function initMasonry() {
 
     if (hasLikedGalleryImage(imageKey)) {
       showGalleryLikeCount(button, Number(button.dataset.galleryLikeCount) || readLocalGalleryLikeCount(imageKey));
+      scheduleGalleryLikeCountHydration(0);
       return;
     }
 
@@ -437,7 +517,10 @@ export function initMasonry() {
     button.setAttribute("aria-pressed", "true");
     playGalleryLikeBurst(button);
 
-    var count = incrementLocalGalleryLikeCount(imageKey);
+    var baseCount = Math.max(Number(button.dataset.galleryLikeCount) || 0, readLocalGalleryLikeCount(imageKey));
+    var count = baseCount + 1;
+    setGalleryLikeButtonCount(button, count);
+    writeLocalGalleryLikeCount(imageKey, count);
     showGalleryLikeCount(button, count);
 
     try {
@@ -719,6 +802,7 @@ export function initMasonry() {
         ? "相册已显示 " + progress.loaded + " 张照片，" + progress.failed + " 张加载失败，已自动跳过"
         : "相册已加载完成，共 " + progress.loaded + " 张照片";
       progress.status.classList.add("complete");
+      scheduleGalleryLikeCountHydration(0);
       clearInterval(progressUpdateTimer);
       progressHideTimer = setTimeout(function () {
         progress.status.classList.add("is-fading");
