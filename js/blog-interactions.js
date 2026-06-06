@@ -392,7 +392,7 @@ function getSupabaseClient() {
 
 function getUserDisplayName(user) {
   if (!user) return "";
-  return user.user_metadata?.user_name || user.user_metadata?.preferred_username || user.user_metadata?.name || user.email || "Email User";
+  return user.user_metadata?.user_name || user.user_metadata?.preferred_username || user.user_metadata?.name || user.user_metadata?.account_name || user.email || "Blog User";
 }
 
 function getUserAvatar(user) {
@@ -404,7 +404,7 @@ function createAuthControlItem(className) {
   item.className = className;
   item.innerHTML = `
     <button class="blog-auth-button" type="button" data-auth-action="sign-in">
-      <i class="fa-brands fa-github fa-fw"></i>
+      <i class="fa-regular fa-user fa-fw"></i>
       <span data-auth-label>LOGIN</span>
     </button>
     <div class="blog-auth-menu" hidden>
@@ -983,7 +983,7 @@ function renderCommentArea(context, force = false) {
       <div class="blog-comment-card-header">
         <div>
           <div class="blog-comment-eyebrow">Supabase Auth</div>
-          <div class="blog-comment-title">用 GitHub 或邮箱身份参与讨论</div>
+          <div class="blog-comment-title">登录后参与讨论</div>
         </div>
         ${user ? `
           <div class="supabase-comment-user">
@@ -998,7 +998,7 @@ function renderCommentArea(context, force = false) {
         `}
       </div>
       <p class="blog-comment-note">
-        ${user ? "当前评论会使用你的登录昵称和头像。" : "请先登录，再发布评论。登录状态会与顶部导航栏同步。"}
+        ${user ? "当前评论会使用你的登录昵称。" : "请先登录，再发布评论。"}
       </p>
       <div class="supabase-comment-composer" ${user ? "" : "hidden"}>
         <textarea class="supabase-comment-input" maxlength="1000" rows="4" placeholder="写下你的想法..."></textarea>
@@ -1054,7 +1054,7 @@ async function loadSupabaseComments(context) {
         ${renderUserAvatar(comment.user_name, comment.user_avatar)}
         <div class="supabase-comment-body">
           <div class="supabase-comment-meta">
-            <span>${escapeHTML(comment.user_name || "GitHub User")}</span>
+            <span>${escapeHTML(comment.user_name || "Blog User")}</span>
             <time>${escapeHTML(formatCommentTime(comment.created_at))}</time>
           </div>
           <p>${escapeHTML(comment.body).replace(/\n/g, "<br>")}</p>
@@ -1570,7 +1570,7 @@ function ensureGuestbookModal() {
       </button>
       <div class="blog-comment-eyebrow">Guestbook</div>
       <h2 id="guestbook-title">给 Zixi 留言</h2>
-      <p class="guestbook-description">留下你对博客、照片或文章的评价。登录状态会使用顶部 GitHub 账号。</p>
+      <p class="guestbook-description">留下你对博客、照片或文章的评价。登录后即可发送。</p>
       <div class="guestbook-user-line"></div>
       <textarea class="guestbook-input" maxlength="800" rows="5" placeholder="写点什么..."></textarea>
       <div class="guestbook-emoji-row">
@@ -1757,7 +1757,7 @@ function renderSiteComment(comment, replies, likeSummary, isReply = false) {
       ${renderUserAvatar(comment.user_name, comment.user_avatar)}
       <div class="guestbook-history-body">
         <div class="guestbook-history-meta">
-          <span>${escapeHTML(comment.user_name || "GitHub User")}</span>
+          <span>${escapeHTML(comment.user_name || "Blog User")}</span>
           <time>${escapeHTML(formatCommentTime(comment.created_at))}</time>
         </div>
         <p>${escapeHTML(comment.body).replace(/\n/g, "<br>")}</p>
