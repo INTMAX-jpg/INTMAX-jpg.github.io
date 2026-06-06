@@ -14,6 +14,13 @@ const authConfig = {
   supabaseKey: "sb_publishable_H5yhsQ854nw7VJuQXS1EJg_PYdGaMyC",
 };
 
+
+const githubIconMarkup = `
+  <svg class="github-inline-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path fill="currentColor" d="M12 2C6.48 2 2 6.58 2 12.25c0 4.52 2.86 8.35 6.84 9.7.5.1.68-.22.68-.49 0-.24-.01-.88-.01-1.73-2.78.62-3.37-1.38-3.37-1.38-.45-1.18-1.11-1.49-1.11-1.49-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.9 1.57 2.35 1.12 2.92.86.09-.67.35-1.12.63-1.38-2.22-.26-4.56-1.14-4.56-5.08 0-1.12.39-2.04 1.03-2.76-.1-.26-.45-1.31.1-2.72 0 0 .84-.28 2.75 1.05A9.37 9.37 0 0 1 12 6.91c.85 0 1.7.12 2.5.35 1.91-1.33 2.75-1.05 2.75-1.05.55 1.41.2 2.46.1 2.72.64.72 1.03 1.64 1.03 2.76 0 3.95-2.34 4.82-4.57 5.08.36.32.68.95.68 1.92 0 1.38-.01 2.49-.01 2.83 0 .27.18.59.69.49A10.17 10.17 0 0 0 22 12.25C22 6.58 17.52 2 12 2Z" />
+  </svg>
+`;
+
 let supabaseClientPromise = null;
 let currentSession = null;
 let authInitialized = false;
@@ -28,6 +35,7 @@ let homeNoteIntroTimer = null;
 let homeNoteIntroCleanupTimer = null;
 let homeNoteScrollY = 0;
 let homeNoteInteractionLocked = false;
+let authForgotNoteTimer = null;
 
 function isGalleryPage() {
   return window.location.pathname.startsWith("/masonry");
@@ -470,7 +478,7 @@ function injectAuthModal() {
         </div>
       </div>
       <button class="blog-auth-github" type="button">
-        <i class="fa-brands fa-github" aria-hidden="true"></i>
+        ${githubIconMarkup}
         <span>\u4f7f\u7528 GitHub \u767b\u5f55</span>
       </button>
       <div class="blog-auth-divider"><span>\u6216\u4f7f\u7528\u81ea\u5b9a\u4e49\u8d26\u53f7</span></div>
@@ -576,7 +584,19 @@ function showAuthForgotNote() {
   const note = document.querySelector(".blog-auth-forgot-note");
   if (!note) return;
 
+  window.clearTimeout(authForgotNoteTimer);
   note.hidden = false;
+  note.classList.remove("is-leaving", "is-visible");
+  void note.offsetWidth;
+  note.classList.add("is-visible");
+
+  authForgotNoteTimer = window.setTimeout(() => {
+    note.classList.add("is-leaving");
+    window.setTimeout(() => {
+      note.hidden = true;
+      note.classList.remove("is-visible", "is-leaving");
+    }, 820);
+  }, 5000);
 }
 
 function setAuthEmailStatus(message, isError = false) {
@@ -930,7 +950,7 @@ function createEngagementPanel(context) {
       <span>评论</span>
     </button>
     <a class="post-action-button post-github-comment" href="${createIssueUrl(context)}" target="_blank" rel="noopener">
-      <i class="fa-brands fa-github"></i>
+      ${githubIconMarkup}
       <span>GitHub 留言</span>
     </a>
   `;

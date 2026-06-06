@@ -6796,6 +6796,11 @@ body.blog-auth-modal-open {
   color: var(--primary-color);
   border-color: var(--primary-color);
 }
+.github-inline-icon {
+  width: 1.25em;
+  height: 1.25em;
+  flex: 0 0 auto;
+}
 .blog-auth-divider {
   display: flex;
   align-items: center;
@@ -6885,18 +6890,63 @@ body.blog-auth-modal-open {
   color: var(--primary-color);
 }
 .blog-auth-forgot-note {
+  position: relative;
   justify-self: center;
   max-width: 280px;
-  padding: 14px 16px;
-  border: 1px solid rgba(210, 170, 95, 0.4);
-  border-radius: 4px;
-  background: linear-gradient(145deg, #fff7d6, #f6e8ad);
-  color: #554625;
+  padding: 16px 18px;
+  border: 1px solid rgba(130, 96, 64, 0.12);
+  border-radius: 5px 11px 4px 10px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0) 34%),
+    repeating-linear-gradient(0deg, transparent 0, transparent 25px, rgba(151, 118, 93, 0.11) 26px),
+    #fff5cf;
+  color: #5f5048;
   font-family: "Segoe Print", "Bradley Hand ITC", "KaiTi", "STKaiti", "Comic Sans MS", cursive;
   font-size: 0.9rem;
-  line-height: 1.55;
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.18);
-  transform: rotate(-1.5deg);
+  font-weight: 600;
+  line-height: 1.65;
+  box-shadow: 0 20px 48px rgba(68, 57, 48, 0.2), 0 6px 14px rgba(68, 57, 48, 0.12);
+  transform-origin: 50% 48%;
+}
+.blog-auth-forgot-note::before {
+  content: "";
+  position: absolute;
+  top: -11px;
+  left: 50%;
+  width: 76px;
+  height: 22px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.38), rgba(255, 232, 160, 0.52));
+  box-shadow: 0 2px 8px rgba(95, 80, 72, 0.12);
+  transform: translateX(-50%) rotate(-1.2deg);
+}
+.blog-auth-forgot-note.is-visible {
+  animation: zixi-auth-forgot-note-in 0.54s cubic-bezier(0.2, 0.82, 0.22, 1) forwards;
+}
+.blog-auth-forgot-note.is-leaving {
+  animation: zixi-auth-forgot-note-out 0.82s cubic-bezier(0.38, 0, 0.2, 1) forwards;
+}
+@keyframes zixi-auth-forgot-note-in {
+  from {
+    opacity: 0;
+    transform: rotate(4deg) translateY(18px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(1.8deg) translateY(0) scale(1);
+  }
+}
+@keyframes zixi-auth-forgot-note-out {
+  from {
+    opacity: 1;
+    filter: blur(0);
+    transform: rotate(1.8deg) translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    filter: blur(2px);
+    transform: rotate(-1deg) translateY(-8px) scale(1.22);
+  }
 }
 .blog-auth-email-status {
   min-height: 22px;
