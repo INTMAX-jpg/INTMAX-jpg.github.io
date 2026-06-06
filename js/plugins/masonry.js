@@ -525,11 +525,12 @@ export function initMasonry() {
 
     try {
       count = await persistGalleryLike(imageKey);
-      button.dataset.galleryLikeCount = String(count);
-      showGalleryLikeCount(button, count);
+      setGalleryLikeButtonCount(button, count);
+      writeLocalGalleryLikeCount(imageKey, count);
     } catch (error) {
       console.warn("Gallery likes are using local fallback.", error);
-      button.dataset.galleryLikeCount = String(count);
+      setGalleryLikeButtonCount(button, count);
+      writeLocalGalleryLikeCount(imageKey, count);
     } finally {
       button.dataset.likeBusy = "false";
     }
