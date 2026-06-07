@@ -7885,9 +7885,14 @@ html[data-theme="dark"] .gallery-note-intro,
   transform: scale(1.06);
   outline: none;
 }
-.gallery-note-reopen i {
-  font-size: 1rem;
-  line-height: 1;
+.gallery-note-reopen svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 html.dark .gallery-note-reopen,
 html[data-theme="dark"] .gallery-note-reopen,

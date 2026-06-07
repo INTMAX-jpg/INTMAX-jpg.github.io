@@ -77,7 +77,13 @@ function ensureGalleryNoteButton() {
   button.className = "gallery-note-reopen";
   button.type = "button";
   button.setAttribute("aria-label", "重新查看相册便签");
-  button.innerHTML = '<i class="fa-regular fa-envelope" aria-hidden="true"></i>';
+  button.innerHTML = `
+    <svg class="gallery-note-camera-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M4.5 8.2h3.1l1.15-1.85h6.5L16.4 8.2h3.1c.9 0 1.65.75 1.65 1.65v7.3c0 .9-.75 1.65-1.65 1.65h-15c-.9 0-1.65-.75-1.65-1.65v-7.3c0-.9.75-1.65 1.65-1.65Z" />
+      <circle cx="12" cy="13.5" r="3.25" />
+      <path d="M17.65 10.55h.05" />
+    </svg>
+  `;
   button.addEventListener("click", () => {
     removeGalleryNoteButton();
     showGalleryNoteIntro({ replay: true });
