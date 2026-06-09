@@ -26,7 +26,7 @@ let currentSession = null;
 let authInitialized = false;
 let authListenerInitialized = false;
 let activePostContext = null;
-let galleryPreloadStarted = false;
+let galleryPreloadScheduleStarted = false;
 const galleryNoteIntroStorageKey = "ZIXI_GALLERY_NOTE_INTRO_SEEN";
 const homeNoteIntroStorageKey = "ZIXI_HOME_NOTE_INTRO_SEEN";
 let galleryNoteIntroTimer = null;
@@ -326,54 +326,34 @@ function canPreloadGallery() {
   return !connection.saveData && !String(connection.effectiveType || "").endsWith("2g");
 }
 
-function normalizeGalleryPreloadFiles(files) {
-  if (!Array.isArray(files)) return [];
-  return files
-    .map((file) => {
-      if (typeof file === "string") {
-        return `/images/gallery_compress/${encodeURIComponent(file)}`;
-      }
-      return file?.url || null;
-    })
-    .filter(Boolean);
-}
+async function getGalleryRuntimeApi() {
+  if (window.__ZIXI_GALLERY__) return window.__ZIXI_GALLERY__;
 
-async function preloadGalleryImage(url) {
   try {
-    const response = await fetch(url, { cache: "force-cache", priority: "low" });
-    if (!response.ok) return;
-    await response.blob();
-  } catch (error) {}
-}
-
-async function runGalleryPreloadQueue(urls) {
-  const queue = urls.slice();
-  const worker = async () => {
-    while (queue.length && canPreloadGallery()) {
-      await preloadGalleryImage(queue.shift());
-    }
-  };
-
-  await Promise.all([worker(), worker()]);
+    const module = await import("/js/build/plugins/masonry.js");
+    return window.__ZIXI_GALLERY__ || module;
+  } catch (error) {
+    return null;
+  }
 }
 
 async function startGalleryPreload() {
-  if (galleryPreloadStarted || isGalleryPage() || !canPreloadGallery()) return;
-  galleryPreloadStarted = true;
+  if (isGalleryPage() || !canPreloadGallery()) return;
+
+  const galleryApi = await getGalleryRuntimeApi();
+  if (!galleryApi) return;
 
   try {
-    const response = await fetch("/images/gallery_compress/photos.json", {
-      cache: "force-cache",
-      priority: "low",
-    });
-    if (!response.ok) return;
-    const urls = normalizeGalleryPreloadFiles(await response.json());
-    await runGalleryPreloadQueue(urls);
+    galleryApi.preloadMasonryPage?.();
+    await galleryApi.preloadGalleryData?.({ limit: 8, concurrency: 2 });
+    await galleryApi.preloadAllGalleryImages?.({ concurrency: 2 });
   } catch (error) {}
 }
 
 function scheduleGalleryPreload() {
-  if (galleryPreloadStarted || isGalleryPage() || !canPreloadGallery()) return;
+  if (galleryPreloadScheduleStarted || isGalleryPage() || !canPreloadGallery()) return;
+  galleryPreloadScheduleStarted = true;
+
   const begin = () => {
     if ("requestIdleCallback" in window) {
       window.requestIdleCallback(startGalleryPreload, { timeout: 2500 });

@@ -12,11 +12,19 @@ const galleryCache = window.__GALLERY_CACHE__ || {
   files: null,
   preloadedImages: new Map(),
   preloadStarted: false,
+  preloadInitialPromise: null,
+  preloadAllStarted: false,
+  preloadAllPromise: null,
 };
 const galleryPreloadImageLimit = 8;
 let masonryPagePreloadStarted = false;
+let galleryWarmupScheduled = false;
 
 window.__GALLERY_CACHE__ = galleryCache;
+
+if (!(galleryCache.preloadedImages instanceof Map)) {
+  galleryCache.preloadedImages = new Map();
+}
 
 function getGalleryFiles() {
   if (galleryCache.files) {
@@ -106,21 +114,101 @@ function isImageFile(name) {
   return /\.(avif|gif|jpe?g|png|webp)$/i.test(name);
 }
 
-export function preloadGalleryData() {
-  if (galleryCache.preloadStarted) return galleryCache.filesPromise || Promise.resolve(galleryCache.files || []);
+function canPreloadGallery() {
+  var connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (!connection) return true;
+  return !connection.saveData && !String(connection.effectiveType || "").endsWith("2g");
+}
+
+function ensurePreloadedGalleryImage(url) {
+  if (!url) return Promise.resolve(null);
+
+  var preloadImage = galleryCache.preloadedImages.get(url);
+  if (preloadImage && preloadImage.complete && preloadImage.naturalWidth > 0) {
+    return Promise.resolve(preloadImage);
+  }
+  if (preloadImage && preloadImage.__galleryPreloadPromise) {
+    return preloadImage.__galleryPreloadPromise;
+  }
+
+  preloadImage = preloadImage || new Image();
+  preloadImage.decoding = "async";
+  preloadImage.loading = "eager";
+
+  preloadImage.__galleryPreloadPromise = new Promise(function (resolve) {
+    preloadImage.onload = function () {
+      resolve(preloadImage);
+    };
+    preloadImage.onerror = function () {
+      galleryCache.preloadedImages.delete(url);
+      resolve(null);
+    };
+  });
+
+  galleryCache.preloadedImages.set(url, preloadImage);
+  if (!preloadImage.src) preloadImage.src = url;
+
+  return preloadImage.__galleryPreloadPromise;
+}
+
+function preloadGalleryImageBatch(files, concurrency) {
+  var queue = Array.isArray(files) ? files.slice() : [];
+  var workerCount = Math.max(1, Number(concurrency) || 2);
+  var workers = [];
+
+  function worker() {
+    var file = queue.shift();
+    if (!file || !canPreloadGallery()) return Promise.resolve();
+    return ensurePreloadedGalleryImage(file.url).then(worker);
+  }
+
+  for (var i = 0; i < workerCount; i += 1) {
+    workers.push(worker());
+  }
+
+  return Promise.all(workers);
+}
+
+export function preloadGalleryData(options) {
+  var settings = options || {};
+  var limit = Number.isFinite(settings.limit) ? settings.limit : galleryPreloadImageLimit;
+  var concurrency = settings.concurrency || 2;
+
+  if (!settings.force && galleryCache.preloadInitialPromise) {
+    return galleryCache.preloadInitialPromise;
+  }
   galleryCache.preloadStarted = true;
 
-  return getGalleryFiles().then(function (files) {
-    files.slice(0, galleryPreloadImageLimit).forEach(function (file) {
-      if (!file.url || galleryCache.preloadedImages.has(file.url)) return;
-      var preloadImage = new Image();
-      preloadImage.decoding = "async";
-      preloadImage.loading = "eager";
-      preloadImage.src = file.url;
-      galleryCache.preloadedImages.set(file.url, preloadImage);
+  galleryCache.preloadInitialPromise = getGalleryFiles().then(function (files) {
+    var initialFiles = files.slice(0, limit);
+    return preloadGalleryImageBatch(initialFiles, concurrency).then(function () {
+      return files;
     });
-    return files;
   });
+
+  return galleryCache.preloadInitialPromise;
+}
+
+export function preloadAllGalleryImages(options) {
+  var settings = options || {};
+  if (galleryCache.preloadAllPromise) return galleryCache.preloadAllPromise;
+  galleryCache.preloadAllStarted = true;
+
+  var initialWarmup = galleryCache.preloadInitialPromise || preloadGalleryData({
+    limit: galleryPreloadImageLimit,
+    concurrency: settings.concurrency || 2,
+  });
+
+  galleryCache.preloadAllPromise = initialWarmup.then(function () {
+    return getGalleryFiles().then(function (files) {
+      var limit = Number.isFinite(settings.limit) ? settings.limit : files.length;
+      return preloadGalleryImageBatch(files.slice(0, limit), settings.concurrency || 2).then(function () {
+        return files;
+      });
+    });
+  });
+
+  return galleryCache.preloadAllPromise;
 }
 
 function preloadMasonryPage() {
@@ -143,10 +231,40 @@ function preloadMasonryPage() {
   } catch (e) {}
 }
 
+export function scheduleGalleryWarmup() {
+  if (galleryWarmupScheduled || isGalleryPage() || !canPreloadGallery()) return;
+  galleryWarmupScheduled = true;
+
+  var begin = function () {
+    var warmup = function () {
+      preloadMasonryPage();
+      preloadGalleryData({ limit: galleryPreloadImageLimit, concurrency: 2 }).then(function () {
+        preloadAllGalleryImages({ concurrency: 2 });
+      });
+    };
+
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(warmup, { timeout: 2500 });
+    } else {
+      window.setTimeout(warmup, 1200);
+    }
+  };
+
+  if (document.readyState === "complete") {
+    begin();
+  } else {
+    window.addEventListener("load", begin, { once: true });
+  }
+}
+
 function initGalleryRuntime() {
-  preloadMasonryPage();
-  preloadGalleryData();
-  initMasonry();
+  if (isGalleryPage()) {
+    preloadGalleryData({ limit: galleryPreloadImageLimit, concurrency: 2 });
+    initMasonry();
+    return;
+  }
+
+  scheduleGalleryWarmup();
 }
 
 export function initMasonry() {
@@ -977,5 +1095,15 @@ export function initMasonry() {
 try {
   swup.hooks.on("page:view", initGalleryRuntime);
 } catch (e) {}
+
+window.__ZIXI_GALLERY__ = {
+  cache: galleryCache,
+  getGalleryFiles: getGalleryFiles,
+  preloadGalleryData: preloadGalleryData,
+  preloadAllGalleryImages: preloadAllGalleryImages,
+  preloadMasonryPage: preloadMasonryPage,
+  scheduleGalleryWarmup: scheduleGalleryWarmup,
+  initMasonry: initMasonry,
+};
 
 document.addEventListener("DOMContentLoaded", initGalleryRuntime);
