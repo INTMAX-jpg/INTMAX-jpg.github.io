@@ -26,6 +26,10 @@ if (!(galleryCache.preloadedImages instanceof Map)) {
   galleryCache.preloadedImages = new Map();
 }
 
+function isGalleryPage() {
+  return window.location.pathname.startsWith("/masonry");
+}
+
 function getGalleryFiles() {
   if (galleryCache.files) {
     return Promise.resolve(galleryCache.files);
@@ -784,6 +788,19 @@ export function initMasonry() {
     var preloadedImage = galleryCache.preloadedImages.get(img.dataset.src);
     if (preloadedImage && preloadedImage.complete && preloadedImage.naturalWidth > 0) {
       img.src = preloadedImage.src;
+      var item = img.closest(".masonry-item");
+      var shell = img.closest(".masonry-image-shell");
+      requestAnimationFrame(function () {
+        if (!item || !shell || img.dataset.rendered === "true") return;
+        if (img.naturalWidth && img.naturalHeight) {
+          shell.style.setProperty("--gallery-ratio", img.naturalWidth + " / " + img.naturalHeight);
+        } else {
+          shell.style.setProperty("--gallery-ratio", preloadedImage.naturalWidth + " / " + preloadedImage.naturalHeight);
+        }
+        waitForImageDecode(img).then(function () {
+          markImageRendered(img, item, shell);
+        });
+      });
       return;
     }
 
