@@ -1414,6 +1414,10 @@ function isCommentsPage() {
   return window.location.pathname.replace(/\/index\.html$/, "/") === "/comments/";
 }
 
+function isAnalyticsPage() {
+  return window.location.pathname.replace(/\/index\.html$/, "/") === "/analytics/";
+}
+
 function readSiteLikeCount() {
   const value = Number(localStorage.getItem(interactionConfig.siteLikeStorageKey));
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
@@ -2054,6 +2058,145 @@ function initSiteGuestbook(force = false) {
   }
 }
 
+function initVisitorCountEasterEgg() {
+  document.querySelectorAll("#busuanzi_container_site_uv").forEach((container) => {
+    if (container.dataset.analyticsLinkBound === "true") return;
+    container.dataset.analyticsLinkBound = "true";
+    container.classList.add("visitor-count-easter-egg");
+    container.setAttribute("role", "link");
+    container.setAttribute("tabindex", "0");
+    container.setAttribute("aria-label", "Open visitor statistics");
+
+    const openAnalytics = (event) => {
+      event.preventDefault();
+      window.location.href = "/analytics/";
+    };
+
+    container.addEventListener("click", openAnalytics);
+    container.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      openAnalytics(event);
+    });
+  });
+}
+
+function formatAnalyticsLabel(value, fallback = "Unknown") {
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  return trimmed || fallback;
+}
+
+function formatVisitorLocation(location) {
+  const city = formatAnalyticsLabel(location?.city, "");
+  const region = formatAnalyticsLabel(location?.region, "");
+  const country = formatAnalyticsLabel(location?.country, "");
+  const parts = [city, region, country].filter(Boolean);
+  return parts.length ? parts.join(", ") : "an unknown place";
+}
+
+function normalizeAnalyticsList(list) {
+  return Array.isArray(list)
+    ? list.map((item) => ({
+      label: formatAnalyticsLabel(item?.label),
+      count: Math.max(0, Number(item?.count) || 0),
+    })).filter((item) => item.count > 0)
+    : [];
+}
+
+function renderAnalyticsBars(title, items, iconClass) {
+  const normalized = normalizeAnalyticsList(items);
+  const max = normalized.reduce((value, item) => Math.max(value, item.count), 0) || 1;
+  const rows = normalized.length
+    ? normalized.map((item) => {
+      const width = Math.max(8, Math.round((item.count / max) * 100));
+      return `
+        <div class="visitor-analytics-bar-row">
+          <div class="visitor-analytics-bar-meta">
+            <span>${escapeHTML(item.label)}</span>
+            <strong>${item.count}</strong>
+          </div>
+          <div class="visitor-analytics-track" aria-hidden="true">
+            <span style="width:${width}%"></span>
+          </div>
+        </div>
+      `;
+    }).join("")
+    : '<div class="visitor-analytics-empty">No data yet.</div>';
+
+  return `
+    <section class="visitor-analytics-panel">
+      <div class="visitor-analytics-panel-title">
+        <i class="${iconClass}" aria-hidden="true"></i>
+        <h2>${escapeHTML(title)}</h2>
+      </div>
+      <div class="visitor-analytics-bars">${rows}</div>
+    </section>
+  `;
+}
+
+async function fetchVisitorAnalyticsSummary() {
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase.rpc("get_visit_analytics_summary", {
+    p_visitor_id: getVisitorId(),
+  });
+  if (error) throw error;
+  return data || {};
+}
+
+function renderVisitorAnalyticsSummary(summary) {
+  const root = document.querySelector("#visitor-analytics-root");
+  if (!root) return;
+
+  const location = formatVisitorLocation(summary.visitor_location || {});
+  const uniqueVisitors = Math.max(0, Number(summary.unique_visitors) || 0);
+  const pageViews = Math.max(0, Number(summary.total_page_views) || 0);
+
+  root.innerHTML = `
+    <section class="visitor-analytics-hero">
+      <div class="visitor-analytics-kicker">Visitor Signal</div>
+      <h1>It appears that you are in ${escapeHTML(location)}</h1>
+      <p>The statistics for other visitors are as follows:</p>
+      <div class="visitor-analytics-summary-grid">
+        <div class="visitor-analytics-summary-item">
+          <span>Unique Visitors</span>
+          <strong>${uniqueVisitors}</strong>
+        </div>
+        <div class="visitor-analytics-summary-item">
+          <span>Page Views</span>
+          <strong>${pageViews}</strong>
+        </div>
+      </div>
+    </section>
+    <div class="visitor-analytics-grid">
+      ${renderAnalyticsBars("Regions", summary.regions, "fa-solid fa-location-dot")}
+      ${renderAnalyticsBars("Devices", summary.devices, "fa-solid fa-desktop")}
+      ${renderAnalyticsBars("Systems", summary.systems, "fa-solid fa-laptop")}
+      ${renderAnalyticsBars("Browsers", summary.browsers, "fa-regular fa-window-maximize")}
+    </div>
+  `;
+}
+
+async function renderVisitorAnalyticsPage() {
+  const root = document.querySelector("#visitor-analytics-root");
+  if (!root) return;
+  root.innerHTML = '<div class="visitor-analytics-status">Loading visitor statistics...</div>';
+
+  try {
+    const summary = await fetchVisitorAnalyticsSummary();
+    renderVisitorAnalyticsSummary(summary);
+  } catch (error) {
+    console.warn("Visitor analytics summary failed", error);
+    root.innerHTML = `
+      <div class="visitor-analytics-status is-error">
+        Statistics are not ready yet. Please run <code>supabase/visit_analytics.sql</code> again in Supabase SQL Editor.
+      </div>
+    `;
+  }
+}
+
+function initVisitorAnalyticsPage() {
+  if (isAnalyticsPage()) renderVisitorAnalyticsPage();
+}
 function initHomeArticleCardLinks() {
   document.querySelectorAll(".home-article-item").forEach((item) => {
     if (item.dataset.cardLinkBound === "true") return;
@@ -2089,6 +2232,7 @@ function initHomeArticleCardLinks() {
 function initBlogInteractions() {
   installAnalyticsListeners();
   trackPageView();
+  initVisitorCountEasterEgg();
   scheduleGalleryPreload();
   showGalleryNoteIntro();
   showBirthdayCakeIntro();
@@ -2097,6 +2241,7 @@ function initBlogInteractions() {
   initAuth();
   initSiteGuestbook();
   initHomeArticleCardLinks();
+  initVisitorAnalyticsPage();
   const context = getPostContext();
   if (!context) return;
 

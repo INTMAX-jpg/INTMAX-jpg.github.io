@@ -88,3 +88,66 @@ select
 from public.visit_analytics
 group by 1
 order by 1 desc;
+create or replace function public.get_visit_analytics_summary(p_visitor_id text default null)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+with page_views as (
+  select *
+  from public.visit_analytics
+  where event_type = 'page_view'
+),
+visitor_location as (
+  select country, region, city
+  from page_views
+  where visitor_id = p_visitor_id
+    and (country is not null or region is not null or city is not null)
+  order by created_at desc
+  limit 1
+),
+region_summary as (
+  select
+    coalesce(nullif(country, ''), 'Unknown') ||
+      case when city is not null and city <> '' then ' / ' || city else '' end as label,
+    count(distinct visitor_id) as total
+  from page_views
+  group by 1
+  order by total desc, label asc
+  limit 12
+),
+device_summary as (
+  select coalesce(nullif(device_type, ''), 'unknown') as label, count(distinct visitor_id) as total
+  from page_views
+  group by 1
+  order by total desc, label asc
+),
+os_summary as (
+  select coalesce(nullif(os_name, ''), 'Unknown') as label, count(distinct visitor_id) as total
+  from page_views
+  group by 1
+  order by total desc, label asc
+  limit 10
+),
+browser_summary as (
+  select coalesce(nullif(browser_name, ''), 'Unknown') as label, count(distinct visitor_id) as total
+  from page_views
+  group by 1
+  order by total desc, label asc
+  limit 10
+)
+select jsonb_build_object(
+  'total_page_views', (select count(*) from page_views),
+  'unique_visitors', (select count(distinct visitor_id) from page_views),
+  'visitor_location', coalesce((select jsonb_build_object('country', country, 'region', region, 'city', city) from visitor_location), '{}'::jsonb),
+  'regions', coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from region_summary), '[]'::jsonb),
+  'devices', coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from device_summary), '[]'::jsonb),
+  'systems', coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from os_summary), '[]'::jsonb),
+  'browsers', coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from browser_summary), '[]'::jsonb),
+  'generated_at', now()
+);
+$$;
+
+grant execute on function public.get_visit_analytics_summary(text) to anon, authenticated;

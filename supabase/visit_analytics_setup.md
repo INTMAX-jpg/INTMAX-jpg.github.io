@@ -7,7 +7,7 @@ The frontend does not store raw IP addresses and does not call any third-party I
 
 Run `supabase/visit_analytics.sql` in the Supabase SQL Editor.
 
-If you already ran an older version of this file, run it again. It uses `create table if not exists` and will add the GeoIP cache table without deleting old analytics rows.
+If you already ran an older version of this file, run it again. It uses `create table if not exists` and will add the GeoIP cache table plus the `get_visit_analytics_summary` aggregate RPC without deleting old analytics rows.
 
 ## 2. Configure Edge Function secrets
 
