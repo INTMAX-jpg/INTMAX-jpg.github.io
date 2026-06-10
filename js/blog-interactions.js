@@ -104,19 +104,28 @@ function detectOS(userAgent) {
 }
 
 function detectBrowser(userAgent) {
-  const ua = userAgent;
+  const ua = userAgent || "";
+  if (!ua.trim()) return { name: "not claim", version: "" };
+
   const rules = [
-    { name: "Edge", regex: /Edg\/([\d.]+)/ },
-    { name: "Chrome", regex: /Chrome\/([\d.]+)/ },
-    { name: "Firefox", regex: /Firefox\/([\d.]+)/ },
-    { name: "Safari", regex: /Version\/([\d.]+).*Safari/ },
-    { name: "Opera", regex: /OPR\/([\d.]+)/ },
+    { name: "Quark", regex: /(?:Quark|QuarkPC|QuarkBrowser)\/([\w.]+)/i },
+    { name: "Edge", regex: /Edg(?:e|A|iOS)?\/([\d.]+)/i },
+    { name: "Opera", regex: /(?:OPR|Opera)\/([\d.]+)/i },
+    { name: "Firefox", regex: /(?:Firefox|FxiOS)\/([\d.]+)/i },
+    { name: "Chrome", regex: /(?:Chrome|CriOS)\/([\d.]+)/i },
+    { name: "Safari", regex: /Version\/([\d.]+).*Safari/i },
   ];
   for (const rule of rules) {
     const match = ua.match(rule.regex);
     if (match) return { name: rule.name, version: match[1] || "" };
   }
-  return { name: "Unknown", version: "" };
+
+  const productMatches = Array.from(ua.matchAll(/\b([A-Za-z][A-Za-z0-9._-]*)\/([^\s;,)]+)/g));
+  if (!productMatches.length) return { name: "not claim", version: "" };
+
+  const genericNames = new Set(["Mozilla", "AppleWebKit", "KHTML", "Gecko", "Version", "Mobile", "Safari"]);
+  const preferred = [...productMatches].reverse().find((match) => !genericNames.has(match[1])) || productMatches[productMatches.length - 1];
+  return { name: preferred[1], version: preferred[2] || "" };
 }
 
 function buildAnalyticsPayload(eventType, extra = {}) {
