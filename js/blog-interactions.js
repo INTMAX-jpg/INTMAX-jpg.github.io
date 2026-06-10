@@ -14,6 +14,11 @@ const authConfig = {
   supabaseKey: "sb_publishable_H5yhsQ854nw7VJuQXS1EJg_PYdGaMyC",
 };
 
+const analyticsConfig = {
+  endpoint: `${authConfig.supabaseUrl}/functions/v1/track-visit`,
+  visitorStorageKey: "ZIXI_VISITOR_ID",
+  sessionStorageKey: "ZIXI_VISIT_SESSION_ID",
+};
 
 const githubIconMarkup = `
   <svg class="github-inline-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -27,6 +32,9 @@ let authInitialized = false;
 let authListenerInitialized = false;
 let activePostContext = null;
 let galleryPreloadScheduleStarted = false;
+let analyticsListenerInstalled = false;
+let lastTrackedPageKey = "";
+let lastTrackedPageAt = 0;
 const galleryNoteIntroStorageKey = "ZIXI_GALLERY_NOTE_INTRO_SEEN";
 const homeNoteIntroStorageKey = "ZIXI_HOME_NOTE_INTRO_SEEN";
 let galleryNoteIntroTimer = null;
@@ -39,6 +47,144 @@ let authForgotNoteTimer = null;
 
 function isGalleryPage() {
   return window.location.pathname.startsWith("/masonry");
+}
+
+function createAnalyticsId(prefix) {
+  if (window.crypto?.randomUUID) return `${prefix}_${window.crypto.randomUUID()}`;
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
+}
+
+function getStoredAnalyticsId(storage, key, prefix) {
+  try {
+    let value = storage.getItem(key);
+    if (!value) {
+      value = createAnalyticsId(prefix);
+      storage.setItem(key, value);
+    }
+    return value;
+  } catch (error) {
+    return createAnalyticsId(prefix);
+  }
+}
+
+function getVisitorId() {
+  return getStoredAnalyticsId(localStorage, analyticsConfig.visitorStorageKey, "visitor");
+}
+
+function getVisitSessionId() {
+  return getStoredAnalyticsId(sessionStorage, analyticsConfig.sessionStorageKey, "session");
+}
+
+function detectDeviceType(userAgent) {
+  const ua = userAgent.toLowerCase();
+  const maxTouchPoints = navigator.maxTouchPoints || 0;
+  const minScreen = Math.min(window.screen?.width || 0, window.screen?.height || 0);
+  if (/ipad|tablet|playbook|silk/.test(ua) || (maxTouchPoints > 1 && minScreen >= 700)) return "tablet";
+  if (/mobi|iphone|ipod|android.*mobile|windows phone/.test(ua)) return "mobile";
+  return "desktop";
+}
+
+function detectOS(userAgent) {
+  const ua = userAgent;
+  const rules = [
+    { name: "Windows", regex: /Windows NT ([\d.]+)/ },
+    { name: "iOS", regex: /(?:iPhone|iPad|iPod).*OS ([\d_]+)/ },
+    { name: "macOS", regex: /Mac OS X ([\d_]+)/ },
+    { name: "Android", regex: /Android ([\d.]+)/ },
+    { name: "Linux", regex: /Linux/ },
+  ];
+  for (const rule of rules) {
+    const match = ua.match(rule.regex);
+    if (match) return { name: rule.name, version: (match[1] || "").replace(/_/g, ".") };
+  }
+  return { name: "Unknown", version: "" };
+}
+
+function detectBrowser(userAgent) {
+  const ua = userAgent;
+  const rules = [
+    { name: "Edge", regex: /Edg\/([\d.]+)/ },
+    { name: "Chrome", regex: /Chrome\/([\d.]+)/ },
+    { name: "Firefox", regex: /Firefox\/([\d.]+)/ },
+    { name: "Safari", regex: /Version\/([\d.]+).*Safari/ },
+    { name: "Opera", regex: /OPR\/([\d.]+)/ },
+  ];
+  for (const rule of rules) {
+    const match = ua.match(rule.regex);
+    if (match) return { name: rule.name, version: match[1] || "" };
+  }
+  return { name: "Unknown", version: "" };
+}
+
+function buildAnalyticsPayload(eventType, extra = {}) {
+  const userAgent = navigator.userAgent || "";
+  const os = detectOS(userAgent);
+  const browser = detectBrowser(userAgent);
+  return {
+    event_type: eventType,
+    visitor_id: getVisitorId(),
+    session_id: getVisitSessionId(),
+    page_path: window.location.pathname + window.location.search + window.location.hash,
+    page_url: window.location.href,
+    referrer: document.referrer || "",
+    device_type: detectDeviceType(userAgent),
+    os_name: os.name,
+    os_version: os.version,
+    browser_name: browser.name,
+    browser_version: browser.version,
+    user_agent: userAgent,
+    language: navigator.language || "",
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
+    screen_width: window.screen?.width || null,
+    screen_height: window.screen?.height || null,
+    viewport_width: window.innerWidth || null,
+    viewport_height: window.innerHeight || null,
+    pixel_ratio: window.devicePixelRatio || 1,
+    ...extra,
+  };
+}
+
+function sendVisitAnalytics(eventType, extra = {}) {
+  const payload = buildAnalyticsPayload(eventType, extra);
+  try {
+    fetch(analyticsConfig.endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: authConfig.supabaseKey,
+        Authorization: `Bearer ${authConfig.supabaseKey}`,
+      },
+      body: JSON.stringify(payload),
+      keepalive: true,
+    }).catch(() => {});
+  } catch (error) {}
+}
+
+function trackPageView() {
+  const pageKey = window.location.pathname + window.location.search + window.location.hash;
+  const now = Date.now();
+  if (lastTrackedPageKey === pageKey && now - lastTrackedPageAt < 1200) return;
+  lastTrackedPageKey = pageKey;
+  lastTrackedPageAt = now;
+  sendVisitAnalytics("page_view");
+}
+
+function installAnalyticsListeners() {
+  if (analyticsListenerInstalled) return;
+  analyticsListenerInstalled = true;
+  window.addEventListener("zixi:gallery-load-complete", (event) => {
+    const detail = event.detail || {};
+    sendVisitAnalytics("gallery_load", {
+      gallery_load_ms: detail.load_ms,
+      gallery_image_total: detail.total,
+      gallery_image_loaded: detail.loaded,
+      gallery_image_failed: detail.failed,
+      metadata: {
+        completed_bytes: detail.completed_bytes || 0,
+        known_total_bytes: detail.known_total_bytes || 0,
+      },
+    });
+  });
 }
 
 function hasSeenGalleryNoteIntro() {
@@ -1941,6 +2087,8 @@ function initHomeArticleCardLinks() {
   });
 }
 function initBlogInteractions() {
+  installAnalyticsListeners();
+  trackPageView();
   scheduleGalleryPreload();
   showGalleryNoteIntro();
   showBirthdayCakeIntro();

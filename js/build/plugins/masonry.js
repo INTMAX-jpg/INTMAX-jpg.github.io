@@ -293,6 +293,7 @@ export function initMasonry() {
   var renderAuditTimers = [];
   var likeCountsHydrationPromise = null;
   var likeCountsHydrationTimer = null;
+  var galleryLoadAnalyticsSent = false;
 
   var existingInstance = galleryMasonryInstances.get(masonryContainer);
   if (existingInstance) {
@@ -937,6 +938,7 @@ export function initMasonry() {
       progress.status.textContent = progress.failed
         ? "相册已显示 " + progress.loaded + " 张照片，" + progress.failed + " 张加载失败，已自动跳过"
         : "相册已加载完成，共 " + progress.loaded + " 张照片";
+      reportGalleryLoadComplete(progress);
       progress.status.classList.add("complete");
       scheduleGalleryLikeCountHydration(0);
       clearInterval(progressUpdateTimer);
@@ -993,6 +995,23 @@ export function initMasonry() {
       "/" +
       progress.total +
       "）";
+  }
+
+  function reportGalleryLoadComplete(progress) {
+    if (galleryLoadAnalyticsSent || !progress) return;
+    galleryLoadAnalyticsSent = true;
+    try {
+      window.dispatchEvent(new CustomEvent("zixi:gallery-load-complete", {
+        detail: {
+          load_ms: Math.round(performance.now() - progress.startedAt),
+          total: progress.total,
+          loaded: progress.loaded,
+          failed: progress.failed,
+          completed_bytes: progress.completedBytes,
+          known_total_bytes: progress.knownTotalBytes,
+        },
+      }));
+    } catch (error) {}
   }
 
   function auditGalleryRenderState() {
