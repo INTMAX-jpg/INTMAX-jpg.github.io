@@ -8262,3 +8262,15 @@ body.home-note-intro-active {
     transition: none !important;
   }
 }
+
+.analytics-easter-egg-intro {
+  z-index: 10046;
+}
+.analytics-easter-egg-paper {
+  width: min(430px, calc(100vw - 44px));
+  min-height: 190px;
+}
+.analytics-easter-egg-paper p {
+  text-align: center;
+  font-size: clamp(1.35rem, 5vw, 2rem);
+}

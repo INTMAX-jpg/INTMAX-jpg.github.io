@@ -37,10 +37,13 @@ let lastTrackedPageKey = "";
 let lastTrackedPageAt = 0;
 const galleryNoteIntroStorageKey = "ZIXI_GALLERY_NOTE_INTRO_SEEN";
 const homeNoteIntroStorageKey = "ZIXI_HOME_NOTE_INTRO_SEEN";
+const analyticsEasterEggStorageKey = "ZIXI_ANALYTICS_EASTER_EGG_SEEN";
 let galleryNoteIntroTimer = null;
 let galleryNoteIntroCleanupTimer = null;
 let homeNoteIntroTimer = null;
 let homeNoteIntroCleanupTimer = null;
+let analyticsEasterEggTimer = null;
+let analyticsEasterEggCleanupTimer = null;
 let homeNoteScrollY = 0;
 let homeNoteInteractionLocked = false;
 let authForgotNoteTimer = null;
@@ -466,6 +469,67 @@ function showHomeNoteIntro() {
     exitHomeNotePreroll();
   }, 5850);
 }
+
+function hasSeenAnalyticsEasterEgg() {
+  try {
+    return sessionStorage.getItem(analyticsEasterEggStorageKey) === "true";
+  } catch (error) {
+    return false;
+  }
+}
+
+function markAnalyticsEasterEggSeen() {
+  try {
+    sessionStorage.setItem(analyticsEasterEggStorageKey, "true");
+  } catch (error) {}
+}
+
+function clearAnalyticsEasterEggNote() {
+  window.clearTimeout(analyticsEasterEggTimer);
+  window.clearTimeout(analyticsEasterEggCleanupTimer);
+  analyticsEasterEggTimer = null;
+  analyticsEasterEggCleanupTimer = null;
+  document.querySelectorAll(".analytics-easter-egg-intro").forEach((element) => element.remove());
+}
+
+function createAnalyticsEasterEggOverlay() {
+  const overlay = document.createElement("div");
+  overlay.className = "gallery-note-intro analytics-easter-egg-intro";
+  overlay.setAttribute("aria-live", "polite");
+
+  const paper = document.createElement("div");
+  paper.className = "gallery-note-paper analytics-easter-egg-paper";
+  paper.setAttribute("role", "status");
+
+  const copy = document.createElement("p");
+  copy.textContent = "\u606d\u559c\u4f60\u53d1\u73b0\u4e86\u5f69\u86cb\uff01";
+
+  paper.appendChild(copy);
+  overlay.appendChild(paper);
+  return overlay;
+}
+
+function showAnalyticsEasterEggNote() {
+  if (!isAnalyticsPage()) {
+    clearAnalyticsEasterEggNote();
+    return;
+  }
+
+  if (hasSeenAnalyticsEasterEgg() || document.querySelector(".analytics-easter-egg-intro")) return;
+
+  markAnalyticsEasterEggSeen();
+  const overlay = createAnalyticsEasterEggOverlay();
+  document.body.appendChild(overlay);
+
+  analyticsEasterEggTimer = window.setTimeout(() => {
+    overlay.classList.add("is-leaving");
+  }, 3000);
+
+  analyticsEasterEggCleanupTimer = window.setTimeout(() => {
+    overlay.remove();
+  }, 3850);
+}
+
 function canPreloadGallery() {
   const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
   if (!connection) return true;
@@ -2242,6 +2306,7 @@ function initBlogInteractions() {
   initSiteGuestbook();
   initHomeArticleCardLinks();
   initVisitorAnalyticsPage();
+  showAnalyticsEasterEggNote();
   const context = getPostContext();
   if (!context) return;
 
