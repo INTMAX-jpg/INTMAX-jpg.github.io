@@ -5,38 +5,53 @@ The frontend does not store raw IP addresses and does not call any third-party I
 
 ## 1. Create database objects
 
-Run `supabase/visit_analytics.sql` once in the Supabase SQL Editor.
+Run `supabase/visit_analytics.sql` in the Supabase SQL Editor.
+
+If you already ran an older version of this file, run it again. It uses `create table if not exists` and will add the GeoIP cache table without deleting old analytics rows.
 
 ## 2. Configure Edge Function secrets
 
-Set these secrets in Supabase before deployment:
+Set a private analytics salt before deployment:
 
 ```bash
-supabase secrets set SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 supabase secrets set VISIT_ANALYTICS_SALT=your_random_private_salt
 ```
 
 Notes:
 
-- Do not put `SUPABASE_SERVICE_ROLE_KEY` in frontend code or commit it to GitHub.
+- Do not put service-role keys, secret keys, JWT secrets, or database passwords in frontend code or commit them to GitHub.
+- Supabase automatically injects `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` into Edge Functions; recent CLI versions may reject manually setting names that start with `SUPABASE_`.
 - `VISIT_ANALYTICS_SALT` should be a private random string. Changing it will change future `ip_hash` values.
-- Country/region/city are read only from edge/network request headers. If the provider does not supply city headers, `city` will be empty.
 
 ## 3. Deploy the function
 
 ```bash
-supabase functions deploy track-visit
+supabase functions deploy track-visit --no-verify-jwt
 ```
 
-`supabase/config.toml` sets `verify_jwt = false` for this function so anonymous visitors can send page view events.
+`supabase/config.toml` also sets `verify_jwt = false` for this function so anonymous visitors can send page view events.
 
-## 4. Data collected
+## 4. GeoIP behavior
 
-The table stores:
+The frontend still only calls `track-visit` and never sees raw IP addresses.
+
+On the server side, `track-visit`:
+
+1. Reads the visitor IP from request headers.
+2. Computes `ip_hash` with `VISIT_ANALYTICS_SALT`.
+3. Checks `visit_ip_geo_cache` for an existing country/region/city result.
+4. If no cache entry exists, requests `ip-api.com` from the Edge Function server.
+5. Stores only `ip_hash`, country/region/city, provider metadata, and first/recent access timestamps.
+
+Raw IP addresses are not written to Supabase.
+
+## 5. Data collected
+
+The tables store:
 
 - page views
 - unique visitor IDs generated in browser localStorage
-- coarse country/region/city when available from request headers
+- coarse country/region/city from `ip-api.com` or edge request headers
 - desktop/mobile/tablet device type
 - operating system
 - browser name/version

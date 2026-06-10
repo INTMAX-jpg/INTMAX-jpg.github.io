@@ -91,6 +91,174 @@ function getHeaderGeo(req: Request) {
   };
 }
 
+function isProbablyPrivateIp(ip: string) {
+  if (!ip) return true;
+  const normalized = ip.toLowerCase();
+  if (normalized === "localhost" || normalized === "::1" || normalized === "127.0.0.1") return true;
+  if (normalized.startsWith("10.")) return true;
+  if (normalized.startsWith("192.168.")) return true;
+  if (normalized.startsWith("169.254.")) return true;
+  if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
+
+  const private172 = normalized.match(/^172\.(\d+)\./);
+  if (private172) {
+    const block = Number(private172[1]);
+    if (block >= 16 && block <= 31) return true;
+  }
+
+  return false;
+}
+
+function hasUsefulGeo(geo: { country?: string | null; region?: string | null; city?: string | null } | null) {
+  return Boolean(geo?.country || geo?.region || geo?.city);
+}
+
+async function getCachedGeo(supabase: ReturnType<typeof createClient>, ipHash: string | null) {
+  if (!ipHash) return null;
+
+  const { data, error } = await supabase
+    .from("visit_ip_geo_cache")
+    .select("country, region, city, country_code, geo_provider, metadata")
+    .eq("ip_hash", ipHash)
+    .maybeSingle();
+
+  if (error || !data || !hasUsefulGeo(data)) return null;
+
+  await supabase
+    .from("visit_ip_geo_cache")
+    .update({ last_seen_at: new Date().toISOString() })
+    .eq("ip_hash", ipHash);
+
+  return {
+    country: clampText(data.country, 120),
+    region: clampText(data.region, 120),
+    city: clampText(data.city, 120),
+    countryCode: clampText(data.country_code, 20),
+    provider: clampText(data.geo_provider, 80) || "cache",
+    metadata: typeof data.metadata === "object" && data.metadata !== null ? data.metadata : {},
+  };
+}
+
+async function lookupIpApiGeo(ip: string) {
+  if (isProbablyPrivateIp(ip)) return null;
+
+  const fields = [
+    "status",
+    "message",
+    "country",
+    "countryCode",
+    "region",
+    "regionName",
+    "city",
+    "timezone",
+    "isp",
+    "org",
+    "as",
+    "proxy",
+    "hosting",
+    "mobile",
+  ].join(",");
+  const url = `http://ip-api.com/json/${encodeURIComponent(ip)}?fields=${fields}&lang=en`;
+
+  try {
+    const response = await fetch(url, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(1800),
+    });
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    if (data?.status !== "success") return null;
+
+    return {
+      country: clampText(data.country, 120),
+      region: clampText(data.regionName || data.region, 120),
+      city: clampText(data.city, 120),
+      countryCode: clampText(data.countryCode, 20),
+      provider: "ip-api.com",
+      metadata: {
+        timezone: clampText(data.timezone, 120),
+        isp: clampText(data.isp, 160),
+        org: clampText(data.org, 160),
+        as: clampText(data.as, 160),
+        proxy: Boolean(data.proxy),
+        hosting: Boolean(data.hosting),
+        mobile: Boolean(data.mobile),
+      },
+    };
+  } catch (_error) {
+    return null;
+  }
+}
+
+async function cacheGeo(
+  supabase: ReturnType<typeof createClient>,
+  ipHash: string | null,
+  geo: {
+    country?: string | null;
+    region?: string | null;
+    city?: string | null;
+    countryCode?: string | null;
+    provider?: string | null;
+    metadata?: Record<string, unknown>;
+  } | null,
+) {
+  if (!ipHash || !geo || !hasUsefulGeo(geo)) return;
+
+  await supabase.from("visit_ip_geo_cache").upsert(
+    {
+      ip_hash: ipHash,
+      country: clampText(geo.country, 120),
+      region: clampText(geo.region, 120),
+      city: clampText(geo.city, 120),
+      country_code: clampText(geo.countryCode, 20),
+      geo_provider: clampText(geo.provider, 80) || "unknown",
+      metadata: geo.metadata || {},
+      last_seen_at: new Date().toISOString(),
+    },
+    { onConflict: "ip_hash" },
+  );
+}
+
+async function resolveGeo(
+  req: Request,
+  supabase: ReturnType<typeof createClient>,
+  ip: string,
+  ipHash: string | null,
+) {
+  const cachedGeo = await getCachedGeo(supabase, ipHash);
+  if (cachedGeo && hasUsefulGeo(cachedGeo)) return cachedGeo;
+
+  const apiGeo = await lookupIpApiGeo(ip);
+  if (apiGeo && hasUsefulGeo(apiGeo)) {
+    await cacheGeo(supabase, ipHash, apiGeo);
+    return apiGeo;
+  }
+
+  const headerGeo = getHeaderGeo(req);
+  if (hasUsefulGeo(headerGeo)) {
+    const geo = {
+      country: clampText(headerGeo.country, 120),
+      region: clampText(headerGeo.region, 120),
+      city: clampText(headerGeo.city, 120),
+      countryCode: null,
+      provider: "request-headers",
+      metadata: {},
+    };
+    await cacheGeo(supabase, ipHash, geo);
+    return geo;
+  }
+
+  return {
+    country: null,
+    region: null,
+    city: null,
+    countryCode: null,
+    provider: null,
+    metadata: {},
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
@@ -106,10 +274,12 @@ Deno.serve(async (req) => {
   const visitorId = clampText(body.visitor_id, 120);
   if (!visitorId) return jsonResponse({ error: "visitor_id is required" }, 400);
 
+  const supabase = getSupabaseAdminClient();
   const ip = getClientIp(req);
   const ipHash = await sha256(`${analyticsSalt}:${ip}`);
-  const geo = getHeaderGeo(req);
+  const geo = await resolveGeo(req, supabase, ip, ipHash);
   const requestUserAgent = req.headers.get("user-agent") || "";
+  const sourceMetadata = typeof body.metadata === "object" && body.metadata !== null ? body.metadata : {};
 
   const record = {
     event_type: pickEventType(body.event_type),
@@ -139,10 +309,14 @@ Deno.serve(async (req) => {
     gallery_image_total: clampInt(body.gallery_image_total, 0),
     gallery_image_loaded: clampInt(body.gallery_image_loaded, 0),
     gallery_image_failed: clampInt(body.gallery_image_failed, 0),
-    metadata: typeof body.metadata === "object" && body.metadata !== null ? body.metadata : {},
+    metadata: {
+      ...sourceMetadata,
+      geo_provider: geo.provider,
+      geo_country_code: geo.countryCode,
+      geo_metadata: geo.metadata,
+    },
   };
 
-  const supabase = getSupabaseAdminClient();
   const { error } = await supabase.from("visit_analytics").insert(record);
   if (error) return jsonResponse({ error: error.message }, 500);
 

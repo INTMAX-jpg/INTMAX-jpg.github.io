@@ -55,6 +55,29 @@ alter table public.visit_analytics enable row level security;
 -- No anon/authenticated insert policy is created on purpose.
 -- Inserts should go through the Edge Function with SUPABASE_SERVICE_ROLE_KEY.
 
+create table if not exists public.visit_ip_geo_cache (
+  ip_hash text primary key,
+  created_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  country text,
+  region text,
+  city text,
+  country_code text,
+  geo_provider text,
+  metadata jsonb not null default '{}'::jsonb
+);
+
+create index if not exists visit_ip_geo_cache_last_seen_at_idx
+  on public.visit_ip_geo_cache (last_seen_at desc);
+
+create index if not exists visit_ip_geo_cache_country_city_idx
+  on public.visit_ip_geo_cache (country, city);
+
+alter table public.visit_ip_geo_cache enable row level security;
+
+-- No anon/authenticated policy is created on purpose.
+-- This table is written only by the Edge Function service role and stores no raw IP addresses.
+
 create or replace view public.visit_analytics_daily_summary as
 select
   date_trunc('day', created_at) as day,
