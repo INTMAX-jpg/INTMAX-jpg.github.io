@@ -7,7 +7,15 @@ The frontend does not store raw IP addresses and does not call any third-party I
 
 Run `supabase/visit_analytics.sql` in the Supabase SQL Editor.
 
-If you already ran an older version of this file, run it again. It uses `create table if not exists` and will add the GeoIP cache table plus the `get_visit_analytics_summary` aggregate RPC without deleting old analytics rows.
+If you already ran an older version of this file, run it again. It uses `create table if not exists` and will add the GeoIP cache table, the `visit_analytics_rollup` aggregate table, and the `get_visit_analytics_summary` RPC without deleting old analytics rows.
+
+The script also runs one initial refresh:
+
+```sql
+select public.refresh_visit_analytics_rollup();
+```
+
+For faster `/analytics/` loading after new visits, refresh the rollup periodically. The SQL file includes a commented `pg_cron` example that runs every 5 minutes; enable and run that block separately in Supabase SQL Editor after confirming `pg_cron` is available for the project.
 
 ## 2. Configure Edge Function secrets
 

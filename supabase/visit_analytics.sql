@@ -88,6 +88,213 @@ select
 from public.visit_analytics
 group by 1
 order by 1 desc;
+-- Pre-aggregated visitor analytics for the public easter-egg statistics page.
+-- This keeps /analytics/ fast: the frontend can read one small row instead of scanning raw visits.
+create table if not exists public.visit_analytics_rollup (
+  id boolean primary key default true check (id),
+  updated_at timestamptz not null default now(),
+  total_page_views bigint not null default 0,
+  unique_visitors bigint not null default 0,
+  gallery_load_events bigint not null default 0,
+  avg_gallery_load_ms numeric,
+  regions jsonb not null default '[]'::jsonb,
+  countries jsonb not null default '[]'::jsonb,
+  cities jsonb not null default '[]'::jsonb,
+  devices jsonb not null default '[]'::jsonb,
+  systems jsonb not null default '[]'::jsonb,
+  browsers jsonb not null default '[]'::jsonb
+);
+
+alter table public.visit_analytics_rollup enable row level security;
+
+drop policy if exists "Anyone can read visit analytics rollup" on public.visit_analytics_rollup;
+create policy "Anyone can read visit analytics rollup"
+  on public.visit_analytics_rollup
+  for select
+  using (true);
+
+create or replace function public.refresh_visit_analytics_rollup()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  result jsonb;
+begin
+  with page_views as (
+    select *
+    from public.visit_analytics
+    where event_type = 'page_view'
+  ),
+  gallery_loads as (
+    select *
+    from public.visit_analytics
+    where event_type = 'gallery_load'
+  ),
+  region_summary as (
+    select
+      coalesce(nullif(country, ''), 'Unknown') ||
+        case when city is not null and city <> '' then ' / ' || city else '' end as label,
+      count(distinct visitor_id) as total
+    from page_views
+    group by 1
+    order by total desc, label asc
+    limit 12
+  ),
+  country_summary as (
+    select coalesce(nullif(country, ''), 'Unknown') as label, count(distinct visitor_id) as total
+    from page_views
+    group by 1
+    order by total desc, label asc
+    limit 12
+  ),
+  city_summary as (
+    select coalesce(nullif(city, ''), 'Unknown') as label, count(distinct visitor_id) as total
+    from page_views
+    group by 1
+    order by total desc, label asc
+    limit 12
+  ),
+  device_summary as (
+    select coalesce(nullif(device_type, ''), 'unknown') as label, count(distinct visitor_id) as total
+    from page_views
+    group by 1
+    order by total desc, label asc
+  ),
+  os_summary as (
+    select coalesce(nullif(os_name, ''), 'Unknown') as label, count(distinct visitor_id) as total
+    from page_views
+    group by 1
+    order by total desc, label asc
+    limit 10
+  ),
+  browser_summary as (
+    select coalesce(nullif(browser_name, ''), 'not claim') as label, count(distinct visitor_id) as total
+    from page_views
+    group by 1
+    order by total desc, label asc
+    limit 10
+  ),
+  payload as (
+    select
+      true as id,
+      now() as updated_at,
+      (select count(*) from page_views)::bigint as total_page_views,
+      (select count(distinct visitor_id) from page_views)::bigint as unique_visitors,
+      (select count(*) from gallery_loads)::bigint as gallery_load_events,
+      (select avg(gallery_load_ms) from gallery_loads where gallery_load_ms is not null) as avg_gallery_load_ms,
+      coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from region_summary), '[]'::jsonb) as regions,
+      coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from country_summary), '[]'::jsonb) as countries,
+      coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from city_summary), '[]'::jsonb) as cities,
+      coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from device_summary), '[]'::jsonb) as devices,
+      coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from os_summary), '[]'::jsonb) as systems,
+      coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from browser_summary), '[]'::jsonb) as browsers
+  ),
+  upserted as (
+    insert into public.visit_analytics_rollup (
+      id,
+      updated_at,
+      total_page_views,
+      unique_visitors,
+      gallery_load_events,
+      avg_gallery_load_ms,
+      regions,
+      countries,
+      cities,
+      devices,
+      systems,
+      browsers
+    )
+    select
+      id,
+      updated_at,
+      total_page_views,
+      unique_visitors,
+      gallery_load_events,
+      avg_gallery_load_ms,
+      regions,
+      countries,
+      cities,
+      devices,
+      systems,
+      browsers
+    from payload
+    on conflict (id) do update set
+      updated_at = excluded.updated_at,
+      total_page_views = excluded.total_page_views,
+      unique_visitors = excluded.unique_visitors,
+      gallery_load_events = excluded.gallery_load_events,
+      avg_gallery_load_ms = excluded.avg_gallery_load_ms,
+      regions = excluded.regions,
+      countries = excluded.countries,
+      cities = excluded.cities,
+      devices = excluded.devices,
+      systems = excluded.systems,
+      browsers = excluded.browsers
+    returning *
+  )
+  select jsonb_build_object(
+    'total_page_views', total_page_views,
+    'unique_visitors', unique_visitors,
+    'gallery_load_events', gallery_load_events,
+    'avg_gallery_load_ms', avg_gallery_load_ms,
+    'regions', regions,
+    'countries', countries,
+    'cities', cities,
+    'devices', devices,
+    'systems', systems,
+    'browsers', browsers,
+    'generated_at', updated_at
+  )
+  into result
+  from upserted;
+
+  return result;
+end;
+$$;
+
+grant execute on function public.refresh_visit_analytics_rollup() to service_role;
+
+create or replace function public.get_visit_analytics_rollup(p_visitor_id text default null)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+with visitor_location as (
+  select country, region, city
+  from public.visit_analytics
+  where event_type = 'page_view'
+    and visitor_id = p_visitor_id
+    and (country is not null or region is not null or city is not null)
+  order by created_at desc
+  limit 1
+),
+rollup as (
+  select *
+  from public.visit_analytics_rollup
+  where id = true
+)
+select jsonb_build_object(
+  'total_page_views', coalesce((select total_page_views from rollup), 0),
+  'unique_visitors', coalesce((select unique_visitors from rollup), 0),
+  'gallery_load_events', coalesce((select gallery_load_events from rollup), 0),
+  'avg_gallery_load_ms', (select avg_gallery_load_ms from rollup),
+  'visitor_location', coalesce((select jsonb_build_object('country', country, 'region', region, 'city', city) from visitor_location), '{}'::jsonb),
+  'regions', coalesce((select regions from rollup), '[]'::jsonb),
+  'countries', coalesce((select countries from rollup), '[]'::jsonb),
+  'cities', coalesce((select cities from rollup), '[]'::jsonb),
+  'devices', coalesce((select devices from rollup), '[]'::jsonb),
+  'systems', coalesce((select systems from rollup), '[]'::jsonb),
+  'browsers', coalesce((select browsers from rollup), '[]'::jsonb),
+  'generated_at', (select updated_at from rollup)
+);
+$$;
+
+-- Keep the existing frontend RPC name fast without requiring an immediate frontend change.
+-- If the rollup has not been generated yet, it falls back to the original live aggregation.
 create or replace function public.get_visit_analytics_summary(p_visitor_id text default null)
 returns jsonb
 language sql
@@ -95,10 +302,18 @@ stable
 security definer
 set search_path = public
 as $$
-with page_views as (
+with rollup_exists as (
+  select exists(select 1 from public.visit_analytics_rollup where id = true) as has_rollup
+),
+rollup_payload as (
+  select public.get_visit_analytics_rollup(p_visitor_id) as payload
+  where (select has_rollup from rollup_exists)
+),
+page_views as (
   select *
   from public.visit_analytics
   where event_type = 'page_view'
+    and not (select has_rollup from rollup_exists)
 ),
 visitor_location as (
   select country, region, city
@@ -132,22 +347,46 @@ os_summary as (
   limit 10
 ),
 browser_summary as (
-  select coalesce(nullif(browser_name, ''), 'Unknown') as label, count(distinct visitor_id) as total
+  select coalesce(nullif(browser_name, ''), 'not claim') as label, count(distinct visitor_id) as total
   from page_views
   group by 1
   order by total desc, label asc
   limit 10
+),
+live_payload as (
+  select jsonb_build_object(
+    'total_page_views', (select count(*) from page_views),
+    'unique_visitors', (select count(distinct visitor_id) from page_views),
+    'visitor_location', coalesce((select jsonb_build_object('country', country, 'region', region, 'city', city) from visitor_location), '{}'::jsonb),
+    'regions', coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from region_summary), '[]'::jsonb),
+    'devices', coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from device_summary), '[]'::jsonb),
+    'systems', coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from os_summary), '[]'::jsonb),
+    'browsers', coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from browser_summary), '[]'::jsonb),
+    'generated_at', now()
+  ) as payload
+  where not (select has_rollup from rollup_exists)
 )
-select jsonb_build_object(
-  'total_page_views', (select count(*) from page_views),
-  'unique_visitors', (select count(distinct visitor_id) from page_views),
-  'visitor_location', coalesce((select jsonb_build_object('country', country, 'region', region, 'city', city) from visitor_location), '{}'::jsonb),
-  'regions', coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from region_summary), '[]'::jsonb),
-  'devices', coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from device_summary), '[]'::jsonb),
-  'systems', coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from os_summary), '[]'::jsonb),
-  'browsers', coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from browser_summary), '[]'::jsonb),
-  'generated_at', now()
-);
+select coalesce((select payload from rollup_payload), (select payload from live_payload));
 $$;
 
+grant execute on function public.get_visit_analytics_rollup(text) to anon, authenticated;
 grant execute on function public.get_visit_analytics_summary(text) to anon, authenticated;
+
+-- Optional initial refresh. Run once after this script, or leave it here if your SQL Editor role can execute it.
+select public.refresh_visit_analytics_rollup();
+
+-- Optional scheduled refresh, recommended every 5 minutes.
+-- Run this block separately after enabling the pg_cron extension in Supabase.
+-- create extension if not exists pg_cron with schema extensions;
+-- do $$
+-- begin
+--   perform cron.unschedule('refresh-visit-analytics-rollup-every-5-minutes');
+-- exception when others then
+--   null;
+-- end;
+-- $$;
+-- select cron.schedule(
+--   'refresh-visit-analytics-rollup-every-5-minutes',
+--   '*/5 * * * *',
+--   $$select public.refresh_visit_analytics_rollup();$$
+-- );
