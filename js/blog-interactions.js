@@ -105,9 +105,16 @@ function detectOS(userAgent) {
 
 function detectBrowser(userAgent) {
   const ua = userAgent || "";
+  const referrer = document.referrer || "";
+  const isWeChatRedirect = referrer.replace(/\/+$/, "") === "https://weixin110.qq.com";
+  if (isWeChatRedirect) {
+    const match = ua.match(/MicroMessenger\/([\w.]+)/i);
+    return { name: "WeChat", version: match?.[1] || "" };
+  }
   if (!ua.trim()) return { name: "not claim", version: "" };
 
   const rules = [
+    { name: "WeChat", regex: /MicroMessenger\/([\w.]+)/i },
     { name: "Quark", regex: /(?:Quark|QuarkPC|QuarkBrowser)\/([\w.]+)/i },
     { name: "Edge", regex: /Edg(?:e|A|iOS)?\/([\d.]+)/i },
     { name: "Opera", regex: /(?:OPR|Opera)\/([\d.]+)/i },
