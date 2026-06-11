@@ -73,6 +73,27 @@ function pickDeviceType(value: unknown) {
 function pickEventType(value: unknown) {
   return value === "gallery_load" ? "gallery_load" : "page_view";
 }
+const botRules = [
+  { name: "Bingbot", regex: /bingbot/i },
+  { name: "Googlebot", regex: /googlebot/i },
+  { name: "Baiduspider", regex: /baiduspider/i },
+  { name: "YandexBot", regex: /yandexbot/i },
+  { name: "DuckDuckBot", regex: /duckduckbot/i },
+  { name: "Bytespider", regex: /bytespider/i },
+  { name: "FacebookExternalHit", regex: /facebookexternalhit/i },
+  { name: "Twitterbot", regex: /twitterbot/i },
+  { name: "LinkedInBot", regex: /linkedinbot/i },
+  { name: "WhatsApp", regex: /whatsapp/i },
+  { name: "TelegramBot", regex: /telegrambot/i },
+];
+
+function detectBot(userAgent: string | null) {
+  const ua = userAgent || "";
+  for (const rule of botRules) {
+    if (rule.regex.test(ua)) return { isBot: true, name: rule.name };
+  }
+  return { isBot: false, name: null };
+}
 
 function safeDecodeHeader(value: string) {
   if (!value) return "";
@@ -271,15 +292,39 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Invalid JSON" }, 400);
   }
 
-  const visitorId = clampText(body.visitor_id, 120);
-  if (!visitorId) return jsonResponse({ error: "visitor_id is required" }, 400);
-
   const supabase = getSupabaseAdminClient();
   const ip = getClientIp(req);
   const ipHash = await sha256(`${analyticsSalt}:${ip}`);
-  const geo = await resolveGeo(req, supabase, ip, ipHash);
   const requestUserAgent = req.headers.get("user-agent") || "";
+  const bodyUserAgent = clampText(body.user_agent, 600);
+  const effectiveUserAgent = bodyUserAgent || clampText(requestUserAgent, 600);
   const sourceMetadata = typeof body.metadata === "object" && body.metadata !== null ? body.metadata : {};
+  const bot = detectBot(effectiveUserAgent);
+
+  if (bot.isBot) {
+    const botRecord = {
+      event_type: pickEventType(body.event_type),
+      page_path: clampText(body.page_path, 500) || "/",
+      page_url: clampText(body.page_url, 1000),
+      referrer: clampText(body.referrer, 1000),
+      ip_hash: ipHash,
+      bot_name: bot.name,
+      user_agent: effectiveUserAgent,
+      metadata: sourceMetadata,
+    };
+
+    const { error } = await supabase.from("bot_visit_logs").insert(botRecord);
+    if (error) {
+      console.warn("bot visit log insert failed", error.message);
+    }
+
+    return jsonResponse({ ok: true, bot: true, bot_name: bot.name, bot_logged: !error });
+  }
+
+  const visitorId = clampText(body.visitor_id, 120);
+  if (!visitorId) return jsonResponse({ error: "visitor_id is required" }, 400);
+
+  const geo = await resolveGeo(req, supabase, ip, ipHash);
 
   const record = {
     event_type: pickEventType(body.event_type),
@@ -297,7 +342,7 @@ Deno.serve(async (req) => {
     os_version: clampText(body.os_version, 120),
     browser_name: clampText(body.browser_name, 120),
     browser_version: clampText(body.browser_version, 120),
-    user_agent: clampText(body.user_agent, 600) || clampText(requestUserAgent, 600),
+    user_agent: effectiveUserAgent,
     language: clampText(body.language, 80),
     timezone: clampText(body.timezone, 120),
     screen_width: clampInt(body.screen_width, 0, 20000),

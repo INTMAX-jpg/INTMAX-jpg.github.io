@@ -63,5 +63,6 @@ The tables store:
 - desktop/mobile/tablet device type
 - operating system
 - browser name/version
+- bot user-agent visits in `bot_visit_logs`, excluded from visitor statistics
 - gallery load duration and image counts
 - `ip_hash`, not raw IP
