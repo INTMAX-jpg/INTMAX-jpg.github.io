@@ -8385,6 +8385,30 @@ body.home-note-intro-active {
 .visitor-analytics-item-icon.is-unknown {
   filter: saturate(0.9);
 }
+.visitor-analytics-item-icon.is-chrome i {
+  background: conic-gradient(from -35deg, #ea4335 0 32%, #fbbc05 32% 54%, #34a853 54% 76%, #4285f4 76% 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.visitor-analytics-item-icon.is-edge i {
+  background: linear-gradient(135deg, #0aa6e8 8%, #0f6cbd 42%, #2bc48a 82%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.visitor-analytics-item-icon.is-safari { color: #0a84ff; }
+.visitor-analytics-item-icon.is-firefox { color: #ff7139; }
+.visitor-analytics-item-icon.is-opera { color: #ff1b2d; }
+.visitor-analytics-item-icon.is-wechat { color: #07c160; }
+.visitor-analytics-item-icon.is-quark {
+  color: #fff;
+  background: #1677ff;
+}
+.visitor-analytics-item-icon.is-windows { color: #00a4ef; }
+.visitor-analytics-item-icon.is-apple { color: #a2aaad; }
+.visitor-analytics-item-icon.is-android { color: #3ddc84; }
+.visitor-analytics-item-icon.is-linux { color: #f6c915; }
 .visitor-analytics-bar-meta strong {
   color: var(--second-text-color);
   font-family: var(--mono-font-family, "Geist Mono", monospace);

@@ -2227,23 +2227,23 @@ function getRegionIconSpec(label) {
 function getBrowserIconSpec(label) {
   const key = normalizeAnalyticsKey(label);
   if (!key || key === "unknown" || key === "not claim") return iconSpec("text", "\u2753", "is-unknown");
-  if (key.includes("chrome")) return iconSpec("class", "fa-brands fa-chrome");
-  if (key.includes("edge")) return iconSpec("class", "fa-brands fa-edge");
-  if (key.includes("safari")) return iconSpec("class", "fa-brands fa-safari");
-  if (key.includes("firefox")) return iconSpec("class", "fa-brands fa-firefox-browser");
-  if (key.includes("opera")) return iconSpec("class", "fa-brands fa-opera");
-  if (key.includes("微信") || key.includes("wechat") || key.includes("micromessenger")) return iconSpec("class", "fa-brands fa-weixin");
-  if (key.includes("quark")) return iconSpec("text", "Q", "is-letter");
+  if (key.includes("chrome")) return iconSpec("class", "fa-brands fa-chrome", "is-chrome");
+  if (key.includes("edge")) return iconSpec("class", "fa-brands fa-edge", "is-edge");
+  if (key.includes("safari")) return iconSpec("class", "fa-brands fa-safari", "is-safari");
+  if (key.includes("firefox")) return iconSpec("class", "fa-brands fa-firefox-browser", "is-firefox");
+  if (key.includes("opera")) return iconSpec("class", "fa-brands fa-opera", "is-opera");
+  if (key.includes("微信") || key.includes("wechat") || key.includes("micromessenger")) return iconSpec("class", "fa-brands fa-weixin", "is-wechat");
+  if (key.includes("quark")) return iconSpec("text", "Q", "is-letter is-quark");
   return iconSpec("class", "fa-regular fa-window-maximize");
 }
 
 function getSystemIconSpec(label) {
   const key = normalizeAnalyticsKey(label);
   if (!key || key === "unknown" || key === "not claim") return iconSpec("text", "\u2753", "is-unknown");
-  if (key.includes("windows")) return iconSpec("class", "fa-brands fa-windows");
-  if (key.includes("ios") || key.includes("mac")) return iconSpec("class", "fa-brands fa-apple");
-  if (key.includes("android")) return iconSpec("class", "fa-brands fa-android");
-  if (key.includes("linux")) return iconSpec("class", "fa-brands fa-linux");
+  if (key.includes("windows")) return iconSpec("class", "fa-brands fa-windows", "is-windows");
+  if (key.includes("ios") || key.includes("mac")) return iconSpec("class", "fa-brands fa-apple", "is-apple");
+  if (key.includes("android")) return iconSpec("class", "fa-brands fa-android", "is-android");
+  if (key.includes("linux")) return iconSpec("class", "fa-brands fa-linux", "is-linux");
   return iconSpec("class", "fa-solid fa-laptop");
 }
 
