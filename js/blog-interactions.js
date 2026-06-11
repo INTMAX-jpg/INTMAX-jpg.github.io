@@ -109,12 +109,12 @@ function detectBrowser(userAgent) {
   const isWeChatRedirect = referrer.replace(/\/+$/, "") === "https://weixin110.qq.com";
   if (isWeChatRedirect) {
     const match = ua.match(/MicroMessenger\/([\w.]+)/i);
-    return { name: "WeChat", version: match?.[1] || "" };
+    return { name: "\u5fae\u4fe1\u5185\u7f6e\u6d4f\u89c8\u5668", version: match?.[1] || "" };
   }
   if (!ua.trim()) return { name: "not claim", version: "" };
 
   const rules = [
-    { name: "WeChat", regex: /MicroMessenger\/([\w.]+)/i },
+    { name: "\u5fae\u4fe1\u5185\u7f6e\u6d4f\u89c8\u5668", regex: /MicroMessenger\/([\w.]+)/i },
     { name: "Quark", regex: /(?:Quark|QuarkPC|QuarkBrowser)\/([\w.]+)/i },
     { name: "Edge", regex: /Edg(?:e|A|iOS)?\/([\d.]+)/i },
     { name: "Opera", regex: /(?:OPR|Opera)\/([\d.]+)/i },
