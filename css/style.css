@@ -8119,9 +8119,6 @@ body.home-note-intro-active {
   touch-action: manipulation;
   transition: color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
 }
-.footer #busuanzi_container_site_uv.visitor-count-easter-egg > * {
-  pointer-events: none;
-}
 .visitor-count-easter-egg:hover,
 .visitor-count-easter-egg:focus-visible {
   color: var(--primary-color);
