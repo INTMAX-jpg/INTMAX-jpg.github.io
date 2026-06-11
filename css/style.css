@@ -8134,16 +8134,31 @@ body.home-note-intro-active {
   align-items: center;
   justify-content: flex-end;
   gap: 0.34em;
-  min-height: 44px;
+  min-width: max-content;
+  min-height: 42px;
   line-height: 1.35;
   cursor: pointer;
   border-radius: 8px;
-  padding: 8px 10px;
-  margin: -8px -10px 0;
+  padding: 9px 12px;
+  margin: -9px -12px 0;
   position: relative;
-  z-index: 2;
+  z-index: 30;
+  pointer-events: auto;
   touch-action: manipulation;
+  user-select: none;
   transition: color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+}
+.footer #busuanzi_container_site_uv.visitor-count-easter-egg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: auto;
+}
+.footer #busuanzi_container_site_uv.visitor-count-easter-egg > * {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
 }
 .visitor-count-easter-egg:hover,
 .visitor-count-easter-egg:focus-visible {

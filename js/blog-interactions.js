@@ -2151,28 +2151,36 @@ function initSiteGuestbook(force = false) {
   }
 }
 
+function openVisitorAnalytics(event) {
+  event.preventDefault();
+  window.location.href = "/analytics/";
+}
+
 function initVisitorCountEasterEgg() {
   document.querySelectorAll("#busuanzi_container_site_uv").forEach((container) => {
-    if (container.dataset.analyticsLinkBound === "true") return;
-    container.dataset.analyticsLinkBound = "true";
+    if (container.dataset.analyticsLinkBound !== "true") {
+      container.dataset.analyticsLinkBound = "true";
+      container.addEventListener("click", openVisitorAnalytics);
+      container.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        openVisitorAnalytics(event);
+      });
+    }
+
     container.classList.add("visitor-count-easter-egg");
     container.setAttribute("role", "link");
     container.setAttribute("tabindex", "0");
     container.setAttribute("aria-label", "Open visitor statistics");
-
-    const openAnalytics = (event) => {
-      event.preventDefault();
-      window.location.href = "/analytics/";
-    };
-
-    container.addEventListener("click", openAnalytics);
-    container.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter" && event.key !== " ") return;
-      openAnalytics(event);
-    });
   });
-}
 
+  if (document.documentElement.dataset.visitorAnalyticsDelegated === "true") return;
+  document.documentElement.dataset.visitorAnalyticsDelegated = "true";
+  document.addEventListener("click", (event) => {
+    const target = event.target.closest?.("#busuanzi_container_site_uv.visitor-count-easter-egg");
+    if (!target) return;
+    openVisitorAnalytics(event);
+  }, true);
+}
 function formatAnalyticsLabel(value, fallback = "Unknown") {
   if (typeof value !== "string") return fallback;
   const trimmed = value.trim();
