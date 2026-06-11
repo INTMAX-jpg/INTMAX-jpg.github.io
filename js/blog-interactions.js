@@ -2249,9 +2249,9 @@ function renderVisitorAnalyticsSummary(summary) {
     </section>
     <div class="visitor-analytics-grid">
       ${renderAnalyticsBars("Regions", summary.regions, "fa-solid fa-location-dot")}
-      ${renderAnalyticsBars("Devices", summary.devices, "fa-solid fa-desktop")}
-      ${renderAnalyticsBars("Systems", summary.systems, "fa-solid fa-laptop")}
       ${renderAnalyticsBars("Browsers", summary.browsers, "fa-regular fa-window-maximize")}
+      ${renderAnalyticsBars("Systems", summary.systems, "fa-solid fa-laptop")}
+      ${renderAnalyticsBars("Devices", summary.devices, "fa-solid fa-desktop")}
       ${renderAnalyticsBars("Crawlers", summary.bots, "fa-solid fa-robot")}
     </div>
   `;
