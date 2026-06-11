@@ -5480,7 +5480,7 @@ div.tabs .tab-content .tab-pane .note:last-child {
 .footer a,
 .footer .odometer,
 .footer .odometer * {
-  font-family: "Segoe Print", "Bradley Hand ITC", "KaiTi", "STKaiti", "Comic Sans MS", cursive !important;
+  font-family: 'Geist Variable', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Heiti SC', 'WenQuanYi Micro Hei', 'Noto Sans SC', 'Segoe UI', Arial, sans-serif !important;
   letter-spacing: 0;
 }
 .page-container .post-tools {
