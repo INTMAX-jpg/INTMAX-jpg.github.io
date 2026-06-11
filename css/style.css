@@ -5735,6 +5735,32 @@ html.is-animating .transition-fade-down {
   overflow: hidden;
   transition: all 0.2s ease;
 }
+.home-page-container .main-content-container {
+  min-height: auto !important;
+  justify-content: flex-start !important;
+}
+.home-page-container .main-content-body {
+  padding-bottom: 18px !important;
+}
+.home-page-container .main-content-footer .footer {
+  margin-top: 0.5rem !important;
+  padding-top: 0.85rem !important;
+  padding-bottom: 0.85rem !important;
+}
+.home-page-container .main-content-footer .footer .info-container {
+  padding-top: 0.45rem !important;
+  padding-bottom: 0.45rem !important;
+}
+@media (max-width: 768px) {
+  .home-page-container .main-content-body {
+    padding-bottom: 12px !important;
+  }
+  .home-page-container .main-content-footer .footer {
+    margin-top: 0.25rem !important;
+    padding-top: 0.7rem !important;
+    padding-bottom: 0.7rem !important;
+  }
+}
 .home-content-container {
   margin-right: 38px;
 }
