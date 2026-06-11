@@ -320,5 +320,10 @@ Deno.serve(async (req) => {
   const { error } = await supabase.from("visit_analytics").insert(record);
   if (error) return jsonResponse({ error: error.message }, 500);
 
-  return jsonResponse({ ok: true });
+  const { error: rollupError } = await supabase.rpc("refresh_visit_analytics_rollup");
+  if (rollupError) {
+    console.warn("visit analytics rollup refresh failed", rollupError.message);
+  }
+
+  return jsonResponse({ ok: true, rollup_refreshed: !rollupError });
 });

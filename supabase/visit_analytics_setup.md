@@ -15,7 +15,7 @@ The script also runs one initial refresh:
 select public.refresh_visit_analytics_rollup();
 ```
 
-For faster `/analytics/` loading after new visits, refresh the rollup periodically. The SQL file includes a commented `pg_cron` example that runs every 5 minutes; enable and run that block separately in Supabase SQL Editor after confirming `pg_cron` is available for the project.
+After the updated `track-visit` Edge Function is deployed, each successful visit insert calls `refresh_visit_analytics_rollup()` immediately. No scheduled task is required.
 
 ## 2. Configure Edge Function secrets
 

@@ -372,21 +372,5 @@ $$;
 grant execute on function public.get_visit_analytics_rollup(text) to anon, authenticated;
 grant execute on function public.get_visit_analytics_summary(text) to anon, authenticated;
 
--- Optional initial refresh. Run once after this script, or leave it here if your SQL Editor role can execute it.
+-- Initial refresh. After the updated Edge Function is deployed, new visits refresh this rollup automatically.
 select public.refresh_visit_analytics_rollup();
-
--- Optional scheduled refresh, recommended every 5 minutes.
--- Run this block separately after enabling the pg_cron extension in Supabase.
--- create extension if not exists pg_cron with schema extensions;
--- do $$
--- begin
---   perform cron.unschedule('refresh-visit-analytics-rollup-every-5-minutes');
--- exception when others then
---   null;
--- end;
--- $$;
--- select cron.schedule(
---   'refresh-visit-analytics-rollup-every-5-minutes',
---   '*/5 * * * *',
---   $$select public.refresh_visit_analytics_rollup();$$
--- );
