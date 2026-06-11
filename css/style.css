@@ -8103,16 +8103,24 @@ body.home-note-intro-active {
   overflow: hidden !important;
   overscroll-behavior: none !important;
 }
-.visitor-count-easter-egg {
-  display: inline-flex;
+.footer #busuanzi_container_site_uv.visitor-count-easter-egg {
+  display: inline-flex !important;
   align-items: center;
-  justify-content: center;
-  min-height: 28px;
+  justify-content: flex-end;
+  gap: 0.34em;
+  min-height: 44px;
+  line-height: 1.35;
   cursor: pointer;
   border-radius: 8px;
-  padding: 2px 6px;
-  margin: -2px -6px 2px;
+  padding: 8px 10px;
+  margin: -8px -10px 0;
+  position: relative;
+  z-index: 2;
+  touch-action: manipulation;
   transition: color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+}
+.footer #busuanzi_container_site_uv.visitor-count-easter-egg > * {
+  pointer-events: none;
 }
 .visitor-count-easter-egg:hover,
 .visitor-count-easter-egg:focus-visible {
