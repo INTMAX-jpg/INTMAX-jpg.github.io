@@ -5483,6 +5483,33 @@ div.tabs .tab-content .tab-pane .note:last-child {
   font-family: 'Geist Variable', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Heiti SC', 'WenQuanYi Micro Hei', 'Noto Sans SC', 'Segoe UI', Arial, sans-serif !important;
   letter-spacing: 0;
 }
+html.dark .footer,
+html.dark .footer span,
+html.dark .footer div,
+html.dark .footer a,
+html.dark .footer .odometer,
+html.dark .footer .odometer *,
+html[data-theme="dark"] .footer,
+html[data-theme="dark"] .footer span,
+html[data-theme="dark"] .footer div,
+html[data-theme="dark"] .footer a,
+html[data-theme="dark"] .footer .odometer,
+html[data-theme="dark"] .footer .odometer *,
+:root[data-theme="dark"] .footer,
+:root[data-theme="dark"] .footer span,
+:root[data-theme="dark"] .footer div,
+:root[data-theme="dark"] .footer a,
+:root[data-theme="dark"] .footer .odometer,
+:root[data-theme="dark"] .footer .odometer *,
+.dark-mode .footer,
+.dark-mode .footer span,
+.dark-mode .footer div,
+.dark-mode .footer a,
+.dark-mode .footer .odometer,
+.dark-mode .footer .odometer * {
+  color: var(--second-text-color) !important;
+  opacity: 0.96;
+}
 .page-container .post-tools {
   position: fixed;
   top: 108px;
