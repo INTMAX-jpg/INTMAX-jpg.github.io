@@ -5480,8 +5480,18 @@ div.tabs .tab-content .tab-pane .note:last-child {
 .footer a,
 .footer .odometer,
 .footer .odometer * {
-  font-family: 'Geist Variable', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Heiti SC', 'WenQuanYi Micro Hei', 'Noto Sans SC', 'Segoe UI', Arial, sans-serif !important;
+  font-family: "Segoe Print", "Bradley Hand ITC", "KaiTi", "STKaiti", "Comic Sans MS", cursive !important;
   letter-spacing: 0;
+}
+@media (max-width: 768px) {
+  .footer,
+  .footer span,
+  .footer div,
+  .footer a,
+  .footer .odometer,
+  .footer .odometer * {
+    font-family: 'Geist Variable', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Heiti SC', 'WenQuanYi Micro Hei', 'Noto Sans SC', 'Segoe UI', Arial, sans-serif !important;
+  }
 }
 html.dark .footer,
 html.dark .footer span,
@@ -8094,7 +8104,10 @@ body.home-note-intro-active {
   overscroll-behavior: none !important;
 }
 .visitor-count-easter-egg {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
   cursor: pointer;
   border-radius: 8px;
   padding: 2px 6px;
