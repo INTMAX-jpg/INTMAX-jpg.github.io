@@ -163,22 +163,35 @@ function buildAnalyticsPayload(eventType, extra = {}) {
   };
 }
 
-function sendVisitAnalytics(eventType, extra = {}) {
+async function postVisitAnalytics(eventType, extra = {}) {
   const payload = buildAnalyticsPayload(eventType, extra);
+  const response = await fetch(analyticsConfig.endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: authConfig.supabaseKey,
+      Authorization: `Bearer ${authConfig.supabaseKey}`,
+    },
+    body: JSON.stringify(payload),
+    keepalive: true,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data?.error || "visit analytics request failed");
+  return data;
+}
+
+function sendVisitAnalytics(eventType, extra = {}) {
   try {
-    fetch(analyticsConfig.endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: authConfig.supabaseKey,
-        Authorization: `Bearer ${authConfig.supabaseKey}`,
-      },
-      body: JSON.stringify(payload),
-      keepalive: true,
-    }).catch(() => {});
+    postVisitAnalytics(eventType, extra).catch(() => {});
   } catch (error) {}
 }
 
+async function registerEasterEggDiscovery() {
+  const data = await postVisitAnalytics("easter_egg_discovery", {
+    metadata: { source: "visitor_analytics_page" },
+  });
+  return data?.discovery || {};
+}
 function trackPageView() {
   const pageKey = window.location.pathname + window.location.search + window.location.hash;
   const now = Date.now();
@@ -2182,7 +2195,133 @@ function normalizeAnalyticsList(list) {
     })).filter((item) => item.count > 0)
     : [];
 }
+function normalizeAnalyticsKey(value) {
+  return String(value || "").trim().toLowerCase();
+}
 
+function iconSpec(type, value, className = "") {
+  return { type, value, className };
+}
+
+function getRegionIconSpec(label) {
+  const key = normalizeAnalyticsKey(label);
+  if (!key || key === "unknown" || key.includes("unknown")) return iconSpec("text", "\u2753", "is-unknown");
+  const flags = [
+    { match: ["china", "beijing", "xi'an", "shanghai", "shenzhen"], flag: "\u{1F1E8}\u{1F1F3}" },
+    { match: ["singapore"], flag: "\u{1F1F8}\u{1F1EC}" },
+    { match: ["united states", "usa", "san francisco", "new york"], flag: "\u{1F1FA}\u{1F1F8}" },
+    { match: ["hong kong"], flag: "\u{1F1ED}\u{1F1F0}" },
+    { match: ["taiwan"], flag: "\u{1F1F9}\u{1F1FC}" },
+    { match: ["japan"], flag: "\u{1F1EF}\u{1F1F5}" },
+    { match: ["united kingdom", "uk", "england", "london"], flag: "\u{1F1EC}\u{1F1E7}" },
+    { match: ["canada"], flag: "\u{1F1E8}\u{1F1E6}" },
+    { match: ["australia"], flag: "\u{1F1E6}\u{1F1FA}" },
+    { match: ["germany"], flag: "\u{1F1E9}\u{1F1EA}" },
+    { match: ["france"], flag: "\u{1F1EB}\u{1F1F7}" },
+    { match: ["india"], flag: "\u{1F1EE}\u{1F1F3}" },
+  ];
+  const found = flags.find((item) => item.match.some((name) => key.includes(name)));
+  return found ? iconSpec("text", found.flag) : iconSpec("class", "fa-solid fa-earth-asia");
+}
+
+function getBrowserIconSpec(label) {
+  const key = normalizeAnalyticsKey(label);
+  if (!key || key === "unknown" || key === "not claim") return iconSpec("text", "\u2753", "is-unknown");
+  if (key.includes("chrome")) return iconSpec("class", "fa-brands fa-chrome");
+  if (key.includes("edge")) return iconSpec("class", "fa-brands fa-edge");
+  if (key.includes("safari")) return iconSpec("class", "fa-brands fa-safari");
+  if (key.includes("firefox")) return iconSpec("class", "fa-brands fa-firefox-browser");
+  if (key.includes("opera")) return iconSpec("class", "fa-brands fa-opera");
+  if (key.includes("微信") || key.includes("wechat") || key.includes("micromessenger")) return iconSpec("class", "fa-brands fa-weixin");
+  if (key.includes("quark")) return iconSpec("text", "Q", "is-letter");
+  return iconSpec("class", "fa-regular fa-window-maximize");
+}
+
+function getSystemIconSpec(label) {
+  const key = normalizeAnalyticsKey(label);
+  if (!key || key === "unknown" || key === "not claim") return iconSpec("text", "\u2753", "is-unknown");
+  if (key.includes("windows")) return iconSpec("class", "fa-brands fa-windows");
+  if (key.includes("ios") || key.includes("mac")) return iconSpec("class", "fa-brands fa-apple");
+  if (key.includes("android")) return iconSpec("class", "fa-brands fa-android");
+  if (key.includes("linux")) return iconSpec("class", "fa-brands fa-linux");
+  return iconSpec("class", "fa-solid fa-laptop");
+}
+
+function getDeviceIconSpec(label) {
+  const key = normalizeAnalyticsKey(label);
+  if (!key || key === "unknown" || key === "not claim") return iconSpec("text", "\u2753", "is-unknown");
+  if (key.includes("mobile")) return iconSpec("class", "fa-solid fa-mobile-screen-button");
+  if (key.includes("tablet")) return iconSpec("class", "fa-solid fa-tablet-screen-button");
+  if (key.includes("desktop")) return iconSpec("class", "fa-solid fa-desktop");
+  return iconSpec("class", "fa-solid fa-display");
+}
+
+function getCrawlerIconSpec(label) {
+  const key = normalizeAnalyticsKey(label);
+  if (!key || key === "unknown" || key === "not claim") return iconSpec("text", "\u2753", "is-unknown");
+  if (key.includes("google")) return iconSpec("class", "fa-brands fa-google");
+  if (key.includes("bing")) return iconSpec("class", "fa-brands fa-microsoft");
+  if (key.includes("facebook")) return iconSpec("class", "fa-brands fa-facebook");
+  if (key.includes("twitter")) return iconSpec("class", "fa-brands fa-x-twitter");
+  if (key.includes("linkedin")) return iconSpec("class", "fa-brands fa-linkedin");
+  if (key.includes("telegram")) return iconSpec("class", "fa-brands fa-telegram");
+  if (key.includes("whatsapp")) return iconSpec("class", "fa-brands fa-whatsapp");
+  return iconSpec("class", "fa-solid fa-robot");
+}
+
+function getAnalyticsItemIconSpec(title, label) {
+  switch (normalizeAnalyticsKey(title)) {
+    case "regions":
+      return getRegionIconSpec(label);
+    case "browsers":
+      return getBrowserIconSpec(label);
+    case "systems":
+      return getSystemIconSpec(label);
+    case "devices":
+      return getDeviceIconSpec(label);
+    case "crawlers":
+      return getCrawlerIconSpec(label);
+    default:
+      return iconSpec("class", "fa-regular fa-circle-dot");
+  }
+}
+
+function renderAnalyticsItemIcon(title, label) {
+  const spec = getAnalyticsItemIconSpec(title, label);
+  const className = `visitor-analytics-item-icon ${spec.className || ""}`.trim();
+  if (spec.type === "class") {
+    return `<span class="${className}" aria-hidden="true"><i class="${spec.value}"></i></span>`;
+  }
+  return `<span class="${className}" aria-hidden="true">${spec.value}</span>`;
+}
+
+function formatOrdinalNumber(value) {
+  const number = Math.max(0, Math.floor(Number(value) || 0));
+  if (!number) return "";
+  const mod100 = number % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${number}th`;
+  const suffix = number % 10 === 1 ? "st" : number % 10 === 2 ? "nd" : number % 10 === 3 ? "rd" : "th";
+  return `${number}${suffix}`;
+}
+
+function renderEasterEggDiscoveryBanner(discovery, summary) {
+  const rank = Math.max(0, Number(discovery?.discovery_rank) || 0);
+  const total = Math.max(0, Number(discovery?.easter_egg_unique_visitors) || Number(summary?.easter_egg_unique_visitors) || 0);
+  const rankText = formatOrdinalNumber(rank || total);
+  if (!rankText) return "";
+
+  const totalLine = total
+    ? `<span class="visitor-analytics-discovery-total">Unique Easter egg discoverers: ${total}</span>`
+    : "";
+
+  return `
+    <section class="visitor-analytics-discovery" aria-label="Easter egg discovery rank">
+      <span class="visitor-analytics-discovery-label">Easter Egg Found</span>
+      <strong>You are the ${escapeHTML(rankText)} one to discover this Easter egg!</strong>
+      ${totalLine}
+    </section>
+  `;
+}
 function renderAnalyticsBars(title, items, iconClass) {
   const normalized = normalizeAnalyticsList(items);
   const max = normalized.reduce((value, item) => Math.max(value, item.count), 0) || 1;
@@ -2192,7 +2331,10 @@ function renderAnalyticsBars(title, items, iconClass) {
       return `
         <div class="visitor-analytics-bar-row">
           <div class="visitor-analytics-bar-meta">
-            <span>${escapeHTML(item.label)}</span>
+            <span class="visitor-analytics-item-label">
+              ${renderAnalyticsItemIcon(title, item.label)}
+              <span>${escapeHTML(item.label)}</span>
+            </span>
             <strong>${item.count}</strong>
           </div>
           <div class="visitor-analytics-track" aria-hidden="true">
@@ -2223,15 +2365,17 @@ async function fetchVisitorAnalyticsSummary() {
   return data || {};
 }
 
-function renderVisitorAnalyticsSummary(summary) {
+function renderVisitorAnalyticsSummary(summary, discovery = {}) {
   const root = document.querySelector("#visitor-analytics-root");
   if (!root) return;
 
   const location = formatVisitorLocation(summary.visitor_location || {});
   const uniqueVisitors = Math.max(0, Number(summary.unique_visitors) || 0);
   const pageViews = Math.max(0, Number(summary.total_page_views) || 0);
+  const discoveryBanner = renderEasterEggDiscoveryBanner(discovery, summary);
 
   root.innerHTML = `
+    ${discoveryBanner}
     <section class="visitor-analytics-hero">
       <div class="visitor-analytics-kicker">Visitor Signal</div>
       <h1><span class="visitor-analytics-headline-mark">It appears that you are in</span> ${escapeHTML(location)}</h1>
@@ -2256,15 +2400,24 @@ function renderVisitorAnalyticsSummary(summary) {
     </div>
   `;
 }
-
 async function renderVisitorAnalyticsPage() {
   const root = document.querySelector("#visitor-analytics-root");
   if (!root) return;
   root.innerHTML = '<div class="visitor-analytics-status">Loading visitor statistics...</div>';
 
   try {
-    const summary = await fetchVisitorAnalyticsSummary();
-    renderVisitorAnalyticsSummary(summary);
+    const [summaryResult, discoveryResult] = await Promise.allSettled([
+      fetchVisitorAnalyticsSummary(),
+      registerEasterEggDiscovery(),
+    ]);
+    if (summaryResult.status === "rejected") throw summaryResult.reason;
+    if (discoveryResult.status === "rejected") {
+      console.warn("Easter egg discovery registration failed", discoveryResult.reason);
+    }
+    renderVisitorAnalyticsSummary(
+      summaryResult.value || {},
+      discoveryResult.status === "fulfilled" ? discoveryResult.value : {},
+    );
   } catch (error) {
     console.warn("Visitor analytics summary failed", error);
     root.innerHTML = `

@@ -73,6 +73,10 @@ function pickDeviceType(value: unknown) {
 function pickEventType(value: unknown) {
   return value === "gallery_load" ? "gallery_load" : "page_view";
 }
+
+function isEasterEggDiscoveryEvent(value: unknown) {
+  return value === "easter_egg_discovery";
+}
 const botRules = [
   { name: "Bingbot", regex: /bingbot/i },
   { name: "Googlebot", regex: /googlebot/i },
@@ -299,6 +303,7 @@ Deno.serve(async (req) => {
   const bodyUserAgent = clampText(body.user_agent, 600);
   const effectiveUserAgent = bodyUserAgent || clampText(requestUserAgent, 600);
   const sourceMetadata = typeof body.metadata === "object" && body.metadata !== null ? body.metadata : {};
+  const isEasterEggDiscovery = isEasterEggDiscoveryEvent(body.event_type);
   const bot = detectBot(effectiveUserAgent);
 
   if (bot.isBot) {
@@ -323,6 +328,14 @@ Deno.serve(async (req) => {
 
   const visitorId = clampText(body.visitor_id, 120);
   if (!visitorId) return jsonResponse({ error: "visitor_id is required" }, 400);
+
+  if (isEasterEggDiscovery) {
+    const { data, error } = await supabase.rpc("register_easter_egg_discovery", {
+      p_visitor_id: visitorId,
+    });
+    if (error) return jsonResponse({ error: error.message }, 500);
+    return jsonResponse({ ok: true, event_type: "easter_egg_discovery", discovery: data || {} });
+  }
 
   const geo = await resolveGeo(req, supabase, ip, ipHash);
 
