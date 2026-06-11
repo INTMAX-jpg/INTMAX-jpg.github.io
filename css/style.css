@@ -8126,6 +8126,19 @@ body.home-note-intro-active {
   outline: none;
   transform: translateY(-1px);
 }
+.analytics-page-container .main-content-container {
+  min-height: auto !important;
+  justify-content: flex-start !important;
+}
+.analytics-page-container .main-content-body {
+  padding-bottom: 0 !important;
+}
+.analytics-page-container .main-content-footer {
+  margin-top: 0 !important;
+}
+.analytics-page-container .footer {
+  margin-top: 0 !important;
+}
 .visitor-analytics-container {
   width: min(1080px, calc(100vw - 36px));
   margin: 110px auto 24px;
