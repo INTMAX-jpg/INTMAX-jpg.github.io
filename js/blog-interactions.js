@@ -2234,7 +2234,7 @@ function renderVisitorAnalyticsSummary(summary) {
   root.innerHTML = `
     <section class="visitor-analytics-hero">
       <div class="visitor-analytics-kicker">Visitor Signal</div>
-      <h1>It appears that you are in ${escapeHTML(location)}</h1>
+      <h1><span class="visitor-analytics-headline-mark">It appears that you are in ${escapeHTML(location)}</span></h1>
       <p>The statistics for other visitors are as follows:</p>
       <div class="visitor-analytics-summary-grid">
         <div class="visitor-analytics-summary-item">
