@@ -128,6 +128,9 @@ create table if not exists public.visit_analytics_rollup (
   browsers jsonb not null default '[]'::jsonb
 );
 
+alter table public.visit_analytics_rollup
+  add column if not exists bots jsonb not null default '[]'::jsonb;
+
 alter table public.visit_analytics_rollup enable row level security;
 
 drop policy if exists "Anyone can read visit analytics rollup" on public.visit_analytics_rollup;
@@ -199,6 +202,13 @@ begin
     order by total desc, label asc
     limit 10
   ),
+  bot_summary as (
+    select coalesce(nullif(bot_name, ''), 'Unknown Bot') as label, count(*) as total
+    from public.bot_visit_logs
+    group by 1
+    order by total desc, label asc
+    limit 10
+  ),
   payload as (
     select
       true as id,
@@ -212,7 +222,8 @@ begin
       coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from city_summary), '[]'::jsonb) as cities,
       coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from device_summary), '[]'::jsonb) as devices,
       coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from os_summary), '[]'::jsonb) as systems,
-      coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from browser_summary), '[]'::jsonb) as browsers
+      coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from browser_summary), '[]'::jsonb) as browsers,
+      coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from bot_summary), '[]'::jsonb) as bots
   ),
   upserted as (
     insert into public.visit_analytics_rollup (
@@ -227,7 +238,8 @@ begin
       cities,
       devices,
       systems,
-      browsers
+      browsers,
+      bots
     )
     select
       id,
@@ -241,7 +253,8 @@ begin
       cities,
       devices,
       systems,
-      browsers
+      browsers,
+      bots
     from payload
     on conflict (id) do update set
       updated_at = excluded.updated_at,
@@ -254,7 +267,8 @@ begin
       cities = excluded.cities,
       devices = excluded.devices,
       systems = excluded.systems,
-      browsers = excluded.browsers
+      browsers = excluded.browsers,
+      bots = excluded.bots
     returning *
   )
   select jsonb_build_object(
@@ -268,6 +282,7 @@ begin
     'devices', devices,
     'systems', systems,
     'browsers', browsers,
+    'bots', bots,
     'generated_at', updated_at
   )
   into result
@@ -312,6 +327,7 @@ select jsonb_build_object(
   'devices', coalesce((select devices from rollup), '[]'::jsonb),
   'systems', coalesce((select systems from rollup), '[]'::jsonb),
   'browsers', coalesce((select browsers from rollup), '[]'::jsonb),
+  'bots', coalesce((select bots from rollup), '[]'::jsonb),
   'generated_at', (select updated_at from rollup)
 );
 $$;
@@ -376,6 +392,13 @@ browser_summary as (
   order by total desc, label asc
   limit 10
 ),
+bot_summary as (
+  select coalesce(nullif(bot_name, ''), 'Unknown Bot') as label, count(*) as total
+  from public.bot_visit_logs
+  group by 1
+  order by total desc, label asc
+  limit 10
+),
 live_payload as (
   select jsonb_build_object(
     'total_page_views', (select count(*) from page_views),
@@ -385,6 +408,7 @@ live_payload as (
     'devices', coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from device_summary), '[]'::jsonb),
     'systems', coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from os_summary), '[]'::jsonb),
     'browsers', coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from browser_summary), '[]'::jsonb),
+    'bots', coalesce((select jsonb_agg(jsonb_build_object('label', label, 'count', total) order by total desc, label asc) from bot_summary), '[]'::jsonb),
     'generated_at', now()
   ) as payload
   where not (select has_rollup from rollup_exists)

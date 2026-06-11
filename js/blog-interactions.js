@@ -2252,6 +2252,7 @@ function renderVisitorAnalyticsSummary(summary) {
       ${renderAnalyticsBars("Devices", summary.devices, "fa-solid fa-desktop")}
       ${renderAnalyticsBars("Systems", summary.systems, "fa-solid fa-laptop")}
       ${renderAnalyticsBars("Browsers", summary.browsers, "fa-regular fa-window-maximize")}
+      ${renderAnalyticsBars("Crawlers", summary.bots, "fa-solid fa-robot")}
     </div>
   `;
 }

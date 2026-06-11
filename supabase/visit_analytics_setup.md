@@ -64,5 +64,6 @@ The tables store:
 - operating system
 - browser name/version
 - bot user-agent visits in `bot_visit_logs`, excluded from visitor statistics
+- crawler statistics in the `/analytics/` easter-egg page
 - gallery load duration and image counts
 - `ip_hash`, not raw IP
