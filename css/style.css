@@ -1528,6 +1528,25 @@ pre .deletion {
   font-size: 2.8rem;
   line-height: 1.2;
   color: var(--home-banner-text-color);
+  position: relative;
+  z-index: 1;
+}
+.home-banner-container .content .description.home-hero-description-stuck {
+  position: fixed;
+  top: var(--home-hero-sticky-top, 88px);
+  left: 0;
+  width: 100vw;
+  z-index: 1;
+  pointer-events: none;
+  transform: translateZ(0);
+}
+.home-page-container .main-content-container {
+  position: relative;
+  z-index: 3;
+}
+.home-page-container .main-content-footer {
+  position: relative;
+  z-index: 4;
 }
 .home-banner-container .content .description p {
   margin: 0;

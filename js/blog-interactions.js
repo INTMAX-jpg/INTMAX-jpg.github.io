@@ -1463,6 +1463,70 @@ function randomizeHomeHeroQuote() {
   const quote = homeHeroQuotes[Math.floor(Math.random() * homeHeroQuotes.length)];
   applyHomeHeroQuote(quote);
 }
+
+const homeHeroStickyState = {
+  pinStart: null,
+  stickyTop: 88,
+};
+
+function resetHomeHeroSticky() {
+  const description = document.querySelector(".home-banner-container .description");
+  if (description) {
+    description.classList.remove("home-hero-description-stuck");
+    description.style.removeProperty("--home-hero-sticky-top");
+  }
+  homeHeroStickyState.pinStart = null;
+}
+
+function getHomeHeroStickyTop() {
+  const header = document.querySelector(".main-content-header");
+  const headerHeight = header?.getBoundingClientRect?.().height || 70;
+  return Math.round(headerHeight + 18);
+}
+
+function updateHomeHeroSticky(forceMeasure = false) {
+  if (!isHomePage()) {
+    resetHomeHeroSticky();
+    return;
+  }
+
+  const description = document.querySelector(".home-banner-container .description");
+  if (!description) return;
+
+  const stickyTop = getHomeHeroStickyTop();
+  const isStuck = description.classList.contains("home-hero-description-stuck");
+
+  if (homeHeroStickyState.pinStart === null || forceMeasure) {
+    if (isStuck) description.classList.remove("home-hero-description-stuck");
+    const rect = description.getBoundingClientRect();
+    homeHeroStickyState.pinStart = Math.max(0, window.scrollY + rect.top - stickyTop);
+    if (isStuck) description.classList.add("home-hero-description-stuck");
+  }
+
+  homeHeroStickyState.stickyTop = stickyTop;
+  description.style.setProperty("--home-hero-sticky-top", `${stickyTop}px`);
+
+  if (window.scrollY >= homeHeroStickyState.pinStart) {
+    description.classList.add("home-hero-description-stuck");
+  } else {
+    description.classList.remove("home-hero-description-stuck");
+  }
+}
+
+function initHomeHeroSticky() {
+  if (!isHomePage()) {
+    resetHomeHeroSticky();
+    return;
+  }
+
+  updateHomeHeroSticky(true);
+
+  if (document.documentElement.dataset.homeHeroStickyBound !== "true") {
+    document.documentElement.dataset.homeHeroStickyBound = "true";
+    window.addEventListener("scroll", () => updateHomeHeroSticky(false), { passive: true });
+    window.addEventListener("resize", () => updateHomeHeroSticky(true));
+  }
+}
 const guestbookEmojis = ["✨", "👏", "📷", "💡", "🌿", "🔥", "😊", "🚀", "☕", "🎧"];
 
 function isHomePage() {
@@ -2543,6 +2607,7 @@ function initBlogInteractions() {
   showBirthdayCakeIntro();
   showHomeNoteIntro();
   randomizeHomeHeroQuote();
+  initHomeHeroSticky();
   initAuth();
   initSiteGuestbook();
   initHomeArticleCardLinks();
