@@ -2153,7 +2153,47 @@ function initSiteGuestbook(force = false) {
 
 function openVisitorAnalytics(event) {
   event.preventDefault();
+  event.stopPropagation?.();
   window.location.href = "/analytics/";
+}
+
+function positionVisitorCountOverlay(container, overlay) {
+  const host = overlay.parentElement;
+  if (!host) return;
+  const containerRect = container.getBoundingClientRect();
+  const hostRect = host.getBoundingClientRect();
+  overlay.style.left = `${containerRect.left - hostRect.left}px`;
+  overlay.style.top = `${containerRect.top - hostRect.top}px`;
+  overlay.style.width = `${containerRect.width}px`;
+  overlay.style.height = `${containerRect.height}px`;
+}
+
+function ensureVisitorCountOverlay(container) {
+  const host = container.parentElement;
+  if (!host) return;
+  host.classList.add("visitor-count-easter-host");
+
+  let overlay = host.querySelector(".visitor-count-easter-overlay");
+  if (!overlay) {
+    overlay = document.createElement("button");
+    overlay.type = "button";
+    overlay.className = "visitor-count-easter-overlay";
+    overlay.setAttribute("aria-label", "Open visitor statistics");
+    overlay.addEventListener("click", openVisitorAnalytics);
+    host.appendChild(overlay);
+  }
+
+  const update = () => positionVisitorCountOverlay(container, overlay);
+  update();
+  requestAnimationFrame(update);
+  window.setTimeout(update, 250);
+}
+
+function refreshVisitorCountOverlays() {
+  document.querySelectorAll("#busuanzi_container_site_uv.visitor-count-easter-egg").forEach((container) => {
+    const overlay = container.parentElement?.querySelector(".visitor-count-easter-overlay");
+    if (overlay) positionVisitorCountOverlay(container, overlay);
+  });
 }
 
 function initVisitorCountEasterEgg() {
@@ -2171,15 +2211,22 @@ function initVisitorCountEasterEgg() {
     container.setAttribute("role", "link");
     container.setAttribute("tabindex", "0");
     container.setAttribute("aria-label", "Open visitor statistics");
+    ensureVisitorCountOverlay(container);
   });
 
-  if (document.documentElement.dataset.visitorAnalyticsDelegated === "true") return;
-  document.documentElement.dataset.visitorAnalyticsDelegated = "true";
-  document.addEventListener("click", (event) => {
-    const target = event.target.closest?.("#busuanzi_container_site_uv.visitor-count-easter-egg");
-    if (!target) return;
-    openVisitorAnalytics(event);
-  }, true);
+  if (document.documentElement.dataset.visitorAnalyticsDelegated !== "true") {
+    document.documentElement.dataset.visitorAnalyticsDelegated = "true";
+    document.addEventListener("click", (event) => {
+      const target = event.target.closest?.("#busuanzi_container_site_uv.visitor-count-easter-egg, .visitor-count-easter-overlay");
+      if (!target) return;
+      openVisitorAnalytics(event);
+    }, true);
+  }
+
+  if (document.documentElement.dataset.visitorAnalyticsResizeBound !== "true") {
+    document.documentElement.dataset.visitorAnalyticsResizeBound = "true";
+    window.addEventListener("resize", refreshVisitorCountOverlays);
+  }
 }
 function formatAnalyticsLabel(value, fallback = "Unknown") {
   if (typeof value !== "string") return fallback;

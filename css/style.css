@@ -8160,6 +8160,25 @@ body.home-note-intro-active {
   z-index: 1;
   pointer-events: none;
 }
+.footer .visitor-count-easter-host {
+  position: relative;
+  z-index: 60 !important;
+}
+.visitor-count-easter-overlay {
+  position: absolute;
+  z-index: 90;
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.visitor-count-easter-overlay:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary-color) 70%, transparent);
+  outline-offset: 2px;
+}
 .visitor-count-easter-egg:hover,
 .visitor-count-easter-egg:focus-visible {
   color: var(--primary-color);
