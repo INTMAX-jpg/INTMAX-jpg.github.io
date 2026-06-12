@@ -1515,8 +1515,8 @@ pre .deletion {
   box-sizing: border-box;
   width: 100%;
   min-height: 100vh;
-  overflow: visible;
-  will-change: auto;
+  overflow: hidden;
+  will-change: transform;
 }
 .home-banner-container .content {
   position: relative;
@@ -1524,14 +1524,18 @@ pre .deletion {
   min-height: auto;
   padding-top: clamp(360px, 62vh, 620px);
 }
-.home-banner-container .content .description {
+.home-banner-container .content .description,
+.home-hero-sticky-clone {
   font-size: 2.8rem;
   line-height: 1.2;
   color: var(--home-banner-text-color);
   position: relative;
   z-index: 1;
 }
-.home-banner-container .content .description.home-hero-description-stuck {
+.home-banner-container .content .description.home-hero-description-stuck-source {
+  opacity: 0;
+}
+.home-hero-sticky-clone {
   position: fixed;
   top: var(--home-hero-sticky-top, 88px);
   left: 0;
@@ -1539,6 +1543,13 @@ pre .deletion {
   z-index: 2;
   pointer-events: none;
   transform: translateZ(0);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  font-family: 'Chillax-Variable', sans-serif;
+  font-weight: 500;
 }
 .home-page-container .home-content-container,
 .home-page-container .home-sidebar-container,
@@ -1553,27 +1564,34 @@ pre .deletion {
   position: relative;
   z-index: 4;
 }
-.home-banner-container .content .description p {
+.home-banner-container .content .description p,
+.home-hero-sticky-clone p {
   margin: 0;
   opacity: 0.9;
   font-family: 'Geist Variable', sans-serif;
   font-weight: 350;
 }
-.home-banner-container .content .description p i {
+.home-banner-container .content .description p i,
+.home-hero-sticky-clone p i {
   font-size: 1.5rem;
   font-style: normal;
 }
-.home-banner-container .content .description p span {
+.home-banner-container .content .description p span,
+.home-hero-sticky-clone p span {
   font-size: 1.575rem;
 }
 html.dark .home-banner-container .content .description,
+html.dark .home-hero-sticky-clone,
 html[data-theme="dark"] .home-banner-container .content .description,
-:root[data-theme="dark"] .home-banner-container .content .description {
+html[data-theme="dark"] .home-hero-sticky-clone,
+:root[data-theme="dark"] .home-banner-container .content .description,
+:root[data-theme="dark"] .home-hero-sticky-clone {
   color: rgba(236, 236, 216, 0.96);
   text-shadow: 0 2px 14px rgba(0, 0, 0, 0.38);
 }
 @media (max-width: 768px) {
-  .home-banner-container .content .description {
+  .home-banner-container .content .description,
+  .home-hero-sticky-clone {
     font-size: 2.52rem;
   }
 }

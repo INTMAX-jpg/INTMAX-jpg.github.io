@@ -1467,14 +1467,67 @@ function randomizeHomeHeroQuote() {
 const homeHeroStickyState = {
   pinStart: null,
   stickyTop: 88,
+  clone: null,
+  observer: null,
+  observedDescription: null,
 };
+
+function stripHomeHeroCloneIds(clone) {
+  clone.removeAttribute("id");
+  clone.querySelectorAll("[id]").forEach((node) => node.removeAttribute("id"));
+}
+
+function syncHomeHeroStickyClone(description) {
+  const clone = homeHeroStickyState.clone;
+  if (!clone || !description) return;
+
+  clone.className = description.className;
+  clone.classList.remove("home-hero-description-stuck-source");
+  clone.classList.remove("home-hero-description-stuck");
+  clone.classList.add("home-hero-sticky-clone");
+  clone.innerHTML = description.innerHTML;
+  clone.setAttribute("aria-hidden", "true");
+  clone.style.setProperty("--home-hero-sticky-top", `${homeHeroStickyState.stickyTop}px`);
+  stripHomeHeroCloneIds(clone);
+}
+
+function ensureHomeHeroStickyClone(description) {
+  if (!homeHeroStickyState.clone) {
+    homeHeroStickyState.clone = document.createElement("div");
+    document.body.appendChild(homeHeroStickyState.clone);
+  }
+  syncHomeHeroStickyClone(description);
+  return homeHeroStickyState.clone;
+}
+
+function removeHomeHeroStickyClone() {
+  homeHeroStickyState.clone?.remove();
+  homeHeroStickyState.clone = null;
+}
+
+function observeHomeHeroStickySource(description) {
+  if (!window.MutationObserver || homeHeroStickyState.observedDescription === description) return;
+  homeHeroStickyState.observer?.disconnect();
+  homeHeroStickyState.observedDescription = description;
+  homeHeroStickyState.observer = new MutationObserver(() => syncHomeHeroStickyClone(description));
+  homeHeroStickyState.observer.observe(description, {
+    childList: true,
+    characterData: true,
+    subtree: true,
+  });
+}
 
 function resetHomeHeroSticky() {
   const description = document.querySelector(".home-banner-container .description");
   if (description) {
+    description.classList.remove("home-hero-description-stuck-source");
     description.classList.remove("home-hero-description-stuck");
     description.style.removeProperty("--home-hero-sticky-top");
   }
+  removeHomeHeroStickyClone();
+  homeHeroStickyState.observer?.disconnect();
+  homeHeroStickyState.observer = null;
+  homeHeroStickyState.observedDescription = null;
   homeHeroStickyState.pinStart = null;
 }
 
@@ -1493,23 +1546,24 @@ function updateHomeHeroSticky(forceMeasure = false) {
   const description = document.querySelector(".home-banner-container .description");
   if (!description) return;
 
+  observeHomeHeroStickySource(description);
+
   const stickyTop = getHomeHeroStickyTop();
-  const isStuck = description.classList.contains("home-hero-description-stuck");
 
   if (homeHeroStickyState.pinStart === null || forceMeasure) {
-    if (isStuck) description.classList.remove("home-hero-description-stuck");
     const rect = description.getBoundingClientRect();
     homeHeroStickyState.pinStart = Math.max(0, window.scrollY + rect.top - stickyTop);
-    if (isStuck) description.classList.add("home-hero-description-stuck");
   }
 
   homeHeroStickyState.stickyTop = stickyTop;
   description.style.setProperty("--home-hero-sticky-top", `${stickyTop}px`);
 
   if (window.scrollY >= homeHeroStickyState.pinStart) {
-    description.classList.add("home-hero-description-stuck");
+    description.classList.add("home-hero-description-stuck-source");
+    ensureHomeHeroStickyClone(description);
   } else {
-    description.classList.remove("home-hero-description-stuck");
+    description.classList.remove("home-hero-description-stuck-source");
+    removeHomeHeroStickyClone();
   }
 }
 
