@@ -1477,6 +1477,16 @@ function stripHomeHeroCloneIds(clone) {
   clone.querySelectorAll("[id]").forEach((node) => node.removeAttribute("id"));
 }
 
+function updateHomeHeroStickyCloneGeometry(description) {
+  const clone = homeHeroStickyState.clone;
+  if (!clone || !description) return;
+
+  const rect = description.getBoundingClientRect();
+  clone.style.top = `${homeHeroStickyState.stickyTop}px`;
+  clone.style.left = `${rect.left}px`;
+  clone.style.width = `${rect.width}px`;
+}
+
 function syncHomeHeroStickyClone(description) {
   const clone = homeHeroStickyState.clone;
   if (!clone || !description) return;
@@ -1487,7 +1497,7 @@ function syncHomeHeroStickyClone(description) {
   clone.classList.add("home-hero-sticky-clone");
   clone.innerHTML = description.innerHTML;
   clone.setAttribute("aria-hidden", "true");
-  clone.style.setProperty("--home-hero-sticky-top", `${homeHeroStickyState.stickyTop}px`);
+  updateHomeHeroStickyCloneGeometry(description);
   stripHomeHeroCloneIds(clone);
 }
 

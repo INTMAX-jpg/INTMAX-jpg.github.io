@@ -1531,6 +1531,7 @@ pre .deletion {
   color: var(--home-banner-text-color);
   position: relative;
   z-index: 1;
+  transition: opacity 0.12s ease;
 }
 .home-banner-container .content .description.home-hero-description-stuck-source {
   opacity: 0;
@@ -1538,8 +1539,8 @@ pre .deletion {
 .home-hero-sticky-clone {
   position: fixed;
   top: var(--home-hero-sticky-top, 88px);
-  left: 0;
-  width: 100vw;
+  left: var(--home-hero-clone-left, 0px);
+  width: var(--home-hero-clone-width, 100vw);
   z-index: 2;
   pointer-events: none;
   transform: translateZ(0);
