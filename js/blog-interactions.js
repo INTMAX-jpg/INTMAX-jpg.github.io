@@ -2157,14 +2157,33 @@ function openVisitorAnalytics(event) {
   window.location.href = "/analytics/";
 }
 
-function positionVisitorCountOverlay(container, overlay) {
+const VISITOR_COUNT_HIT_PADDING_X = 12;
+const VISITOR_COUNT_HIT_PADDING_Y = 8;
+
+function getVisitorCountHitRect(container) {
   const rect = container.getBoundingClientRect();
-  const paddingX = 12;
-  const paddingY = 8;
-  overlay.style.left = `${rect.left - paddingX}px`;
-  overlay.style.top = `${rect.top - paddingY}px`;
-  overlay.style.width = `${rect.width + paddingX * 2}px`;
-  overlay.style.height = `${rect.height + paddingY * 2}px`;
+  return {
+    left: rect.left - VISITOR_COUNT_HIT_PADDING_X,
+    top: rect.top - VISITOR_COUNT_HIT_PADDING_Y,
+    right: rect.right + VISITOR_COUNT_HIT_PADDING_X,
+    bottom: rect.bottom + VISITOR_COUNT_HIT_PADDING_Y,
+    width: rect.width + VISITOR_COUNT_HIT_PADDING_X * 2,
+    height: rect.height + VISITOR_COUNT_HIT_PADDING_Y * 2,
+  };
+}
+
+function isInsideVisitorCountHitArea(event, container) {
+  if (typeof event.clientX !== "number" || typeof event.clientY !== "number") return false;
+  const rect = getVisitorCountHitRect(container);
+  return event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
+}
+
+function positionVisitorCountOverlay(container, overlay) {
+  const rect = getVisitorCountHitRect(container);
+  overlay.style.left = `${rect.left}px`;
+  overlay.style.top = `${rect.top}px`;
+  overlay.style.width = `${rect.width}px`;
+  overlay.style.height = `${rect.height}px`;
 }
 
 function ensureVisitorCountOverlay(container) {
@@ -2214,7 +2233,8 @@ function initVisitorCountEasterEgg() {
     document.documentElement.dataset.visitorAnalyticsDelegated = "true";
     document.addEventListener("click", (event) => {
       const target = event.target.closest?.("#busuanzi_container_site_uv.visitor-count-easter-egg, .visitor-count-easter-overlay");
-      if (!target) return;
+      const container = document.querySelector("#busuanzi_container_site_uv.visitor-count-easter-egg");
+      if (!target && (!container || !isInsideVisitorCountHitArea(event, container))) return;
       openVisitorAnalytics(event);
     }, true);
   }

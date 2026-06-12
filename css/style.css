@@ -8149,9 +8149,13 @@ body.home-note-intro-active {
   padding: 0;
   border: 0;
   border-radius: 8px;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.001);
+  box-sizing: border-box;
   cursor: pointer;
+  pointer-events: auto;
   touch-action: manipulation;
+  -webkit-appearance: none;
+  appearance: none;
 }
 .visitor-count-easter-overlay:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--primary-color) 70%, transparent);
