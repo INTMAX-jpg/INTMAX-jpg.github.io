@@ -2223,16 +2223,30 @@ function openVisitorAnalytics(event) {
 
 const VISITOR_COUNT_HIT_PADDING_X = 12;
 const VISITOR_COUNT_HIT_PADDING_Y = 8;
+let visitorCountResizeObserver = null;
+
+function getVisitorCountPanel(container) {
+  return container?.parentElement || container;
+}
 
 function getVisitorCountHitRect(container) {
-  const rect = container.getBoundingClientRect();
+  const panel = getVisitorCountPanel(container);
+  const containerRect = container.getBoundingClientRect();
+  const panelRect = panel.getBoundingClientRect();
+  const baseRect = panelRect.width > 0 && panelRect.height > 0 ? panelRect : containerRect;
+  const topRowHeight = Math.max(containerRect.height, baseRect.height / 2, 28);
+  const left = baseRect.left - VISITOR_COUNT_HIT_PADDING_X;
+  const top = baseRect.top - VISITOR_COUNT_HIT_PADDING_Y;
+  const width = baseRect.width + VISITOR_COUNT_HIT_PADDING_X * 2;
+  const height = Math.min(baseRect.height + VISITOR_COUNT_HIT_PADDING_Y * 2, topRowHeight + VISITOR_COUNT_HIT_PADDING_Y * 2);
+
   return {
-    left: rect.left - VISITOR_COUNT_HIT_PADDING_X,
-    top: rect.top - VISITOR_COUNT_HIT_PADDING_Y,
-    right: rect.right + VISITOR_COUNT_HIT_PADDING_X,
-    bottom: rect.bottom + VISITOR_COUNT_HIT_PADDING_Y,
-    width: rect.width + VISITOR_COUNT_HIT_PADDING_X * 2,
-    height: rect.height + VISITOR_COUNT_HIT_PADDING_Y * 2,
+    left,
+    top,
+    right: left + width,
+    bottom: top + height,
+    width,
+    height,
   };
 }
 
@@ -2244,14 +2258,34 @@ function isInsideVisitorCountHitArea(event, container) {
 
 function positionVisitorCountOverlay(container, overlay) {
   const rect = getVisitorCountHitRect(container);
+  overlay.hidden = rect.width <= 0 || rect.height <= 0;
   overlay.style.left = `${rect.left}px`;
   overlay.style.top = `${rect.top}px`;
   overlay.style.width = `${rect.width}px`;
   overlay.style.height = `${rect.height}px`;
 }
 
+function observeVisitorCountHitArea(container) {
+  const panel = getVisitorCountPanel(container);
+  panel?.classList.add("visitor-count-easter-panel");
+
+  if (!window.ResizeObserver) return;
+  if (!visitorCountResizeObserver) {
+    visitorCountResizeObserver = new ResizeObserver(() => refreshVisitorCountOverlays());
+  }
+  if (panel && panel.dataset.visitorCountObserved !== "true") {
+    panel.dataset.visitorCountObserved = "true";
+    visitorCountResizeObserver.observe(panel);
+  }
+  if (container.dataset.visitorCountObserved !== "true") {
+    container.dataset.visitorCountObserved = "true";
+    visitorCountResizeObserver.observe(container);
+  }
+}
+
 function ensureVisitorCountOverlay(container) {
   container.parentElement?.classList.remove("visitor-count-easter-host");
+  observeVisitorCountHitArea(container);
 
   let overlay = document.querySelector(".visitor-count-easter-overlay");
   if (!overlay) {
@@ -2272,7 +2306,11 @@ function ensureVisitorCountOverlay(container) {
 function refreshVisitorCountOverlays() {
   const container = document.querySelector("#busuanzi_container_site_uv.visitor-count-easter-egg");
   const overlay = document.querySelector(".visitor-count-easter-overlay");
-  if (container && overlay) positionVisitorCountOverlay(container, overlay);
+  if (!container) {
+    overlay?.remove();
+    return;
+  }
+  if (overlay) positionVisitorCountOverlay(container, overlay);
 }
 
 function initVisitorCountEasterEgg() {
@@ -2306,6 +2344,7 @@ function initVisitorCountEasterEgg() {
   if (document.documentElement.dataset.visitorAnalyticsResizeBound !== "true") {
     document.documentElement.dataset.visitorAnalyticsResizeBound = "true";
     window.addEventListener("resize", refreshVisitorCountOverlays);
+    window.addEventListener("scroll", refreshVisitorCountOverlays, { passive: true });
   }
 }
 function formatAnalyticsLabel(value, fallback = "Unknown") {
