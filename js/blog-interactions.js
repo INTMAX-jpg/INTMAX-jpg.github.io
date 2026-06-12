@@ -2158,29 +2158,26 @@ function openVisitorAnalytics(event) {
 }
 
 function positionVisitorCountOverlay(container, overlay) {
-  const host = overlay.parentElement;
-  if (!host) return;
-  const containerRect = container.getBoundingClientRect();
-  const hostRect = host.getBoundingClientRect();
-  overlay.style.left = `${containerRect.left - hostRect.left}px`;
-  overlay.style.top = `${containerRect.top - hostRect.top}px`;
-  overlay.style.width = `${containerRect.width}px`;
-  overlay.style.height = `${containerRect.height}px`;
+  const rect = container.getBoundingClientRect();
+  const paddingX = 12;
+  const paddingY = 8;
+  overlay.style.left = `${rect.left - paddingX}px`;
+  overlay.style.top = `${rect.top - paddingY}px`;
+  overlay.style.width = `${rect.width + paddingX * 2}px`;
+  overlay.style.height = `${rect.height + paddingY * 2}px`;
 }
 
 function ensureVisitorCountOverlay(container) {
-  const host = container.parentElement;
-  if (!host) return;
-  host.classList.add("visitor-count-easter-host");
+  container.parentElement?.classList.remove("visitor-count-easter-host");
 
-  let overlay = host.querySelector(".visitor-count-easter-overlay");
+  let overlay = document.querySelector(".visitor-count-easter-overlay");
   if (!overlay) {
     overlay = document.createElement("button");
     overlay.type = "button";
     overlay.className = "visitor-count-easter-overlay";
     overlay.setAttribute("aria-label", "Open visitor statistics");
     overlay.addEventListener("click", openVisitorAnalytics);
-    host.appendChild(overlay);
+    document.body.appendChild(overlay);
   }
 
   const update = () => positionVisitorCountOverlay(container, overlay);
@@ -2190,10 +2187,9 @@ function ensureVisitorCountOverlay(container) {
 }
 
 function refreshVisitorCountOverlays() {
-  document.querySelectorAll("#busuanzi_container_site_uv.visitor-count-easter-egg").forEach((container) => {
-    const overlay = container.parentElement?.querySelector(".visitor-count-easter-overlay");
-    if (overlay) positionVisitorCountOverlay(container, overlay);
-  });
+  const container = document.querySelector("#busuanzi_container_site_uv.visitor-count-easter-egg");
+  const overlay = document.querySelector(".visitor-count-easter-overlay");
+  if (container && overlay) positionVisitorCountOverlay(container, overlay);
 }
 
 function initVisitorCountEasterEgg() {
