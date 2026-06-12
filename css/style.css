@@ -1515,8 +1515,8 @@ pre .deletion {
   box-sizing: border-box;
   width: 100%;
   min-height: 100vh;
-  overflow: hidden;
-  will-change: transform;
+  overflow: visible;
+  will-change: auto;
 }
 .home-banner-container .content {
   position: relative;
@@ -1536,15 +1536,20 @@ pre .deletion {
   top: var(--home-hero-sticky-top, 88px);
   left: 0;
   width: 100vw;
-  z-index: 1;
+  z-index: 2;
   pointer-events: none;
   transform: translateZ(0);
 }
-.home-page-container .main-content-container {
+.home-page-container .home-content-container,
+.home-page-container .home-sidebar-container,
+.home-page-container .main-content-footer {
   position: relative;
   z-index: 3;
 }
-.home-page-container .main-content-footer {
+.home-page-container .home-article-item,
+.home-page-container .sidebar-content,
+.home-page-container .sidebar-links,
+.home-page-container .main-content-footer .footer {
   position: relative;
   z-index: 4;
 }
