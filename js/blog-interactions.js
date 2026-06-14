@@ -568,18 +568,37 @@ function showHomeNoteIntro() {
   }, leaveDelay + 850);
 }
 
+function getAnalyticsEasterEggSeenKey() {
+  return `${analyticsEasterEggStorageKey}:${getVisitorId()}`;
+}
+
 function hasSeenAnalyticsEasterEgg() {
   try {
-    return sessionStorage.getItem(analyticsEasterEggStorageKey) === "true";
+    const storageKey = getAnalyticsEasterEggSeenKey();
+    if (localStorage.getItem(storageKey) === "true") return true;
+
+    if (sessionStorage.getItem(analyticsEasterEggStorageKey) === "true") {
+      localStorage.setItem(storageKey, "true");
+      return true;
+    }
   } catch (error) {
-    return false;
+    try {
+      return sessionStorage.getItem(analyticsEasterEggStorageKey) === "true";
+    } catch (_innerError) {}
   }
+
+  return false;
 }
 
 function markAnalyticsEasterEggSeen() {
   try {
+    localStorage.setItem(getAnalyticsEasterEggSeenKey(), "true");
     sessionStorage.setItem(analyticsEasterEggStorageKey, "true");
-  } catch (error) {}
+  } catch (error) {
+    try {
+      sessionStorage.setItem(analyticsEasterEggStorageKey, "true");
+    } catch (_innerError) {}
+  }
 }
 
 function clearAnalyticsEasterEggNote() {
