@@ -49,7 +49,7 @@ let homeNoteInteractionLocked = false;
 let authForgotNoteTimer = null;
 
 const handwrittenNoteConfig = {
-  charDelay: 92,
+  charDelay: 120,
   strokeDuration: 220,
   afterCompleteDelay: 1800,
 };
