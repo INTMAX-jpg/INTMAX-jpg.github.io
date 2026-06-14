@@ -7844,6 +7844,48 @@ html[data-theme="dark"] .birthday-cake-intro,
     animation-iteration-count: 1 !important;
   }
 }
+.zixi-handwriting-text .zixi-handwriting-char {
+  display: inline-block;
+  opacity: 0;
+  filter: blur(0.55px);
+  transform: translate(0.08em, 0.18em) rotate(-1deg) scale(0.96);
+  animation: zixi-note-handwrite-char 0.22s ease-out forwards;
+  animation-delay: var(--zixi-handwriting-delay, 0ms);
+  will-change: opacity, transform, filter;
+}
+.zixi-handwriting-text .zixi-handwriting-space {
+  min-width: 0.34em;
+}
+.zixi-handwriting-text.is-handwriting-complete .zixi-handwriting-char {
+  opacity: 1;
+  filter: none;
+  transform: none;
+}
+@keyframes zixi-note-handwrite-char {
+  0% {
+    opacity: 0;
+    filter: blur(0.55px);
+    transform: translate(0.08em, 0.18em) rotate(-1deg) scale(0.96);
+  }
+  72% {
+    opacity: 0.92;
+    filter: blur(0.12px);
+    transform: translate(0.01em, 0.02em) rotate(0.2deg) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .zixi-handwriting-text .zixi-handwriting-char {
+    opacity: 1 !important;
+    filter: none !important;
+    transform: none !important;
+    animation: none !important;
+  }
+}
 .gallery-note-intro {
   position: fixed;
   inset: 0;

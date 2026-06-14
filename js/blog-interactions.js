@@ -48,6 +48,73 @@ let homeNoteScrollY = 0;
 let homeNoteInteractionLocked = false;
 let authForgotNoteTimer = null;
 
+const handwrittenNoteConfig = {
+  charDelay: 92,
+  strokeDuration: 220,
+  afterCompleteDelay: 1800,
+};
+
+function prefersReducedNoteMotion() {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+}
+
+function wrapHandwrittenNoteText(root) {
+  let order = 0;
+
+  const wrapNode = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent || "";
+      if (!text) return;
+
+      const fragment = document.createDocumentFragment();
+      Array.from(text).forEach((char) => {
+        const span = document.createElement("span");
+        span.className = "zixi-handwriting-char";
+        if (char === " ") {
+          span.classList.add("zixi-handwriting-space");
+          span.textContent = "\u00a0";
+        } else {
+          span.textContent = char;
+        }
+        span.style.setProperty("--zixi-handwriting-delay", `${Math.round(order * handwrittenNoteConfig.charDelay)}ms`);
+        fragment.appendChild(span);
+        order += char.trim() ? 1 : 0.45;
+      });
+
+      node.replaceWith(fragment);
+      return;
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    const tagName = node.tagName?.toLowerCase();
+    if (tagName === "script" || tagName === "style") return;
+    Array.from(node.childNodes).forEach(wrapNode);
+  };
+
+  Array.from(root.childNodes).forEach(wrapNode);
+  return Math.ceil(order * handwrittenNoteConfig.charDelay + handwrittenNoteConfig.strokeDuration);
+}
+
+function startHandwrittenNote(root) {
+  if (!root) return 0;
+
+  root.classList.add("zixi-handwriting-text");
+  if (prefersReducedNoteMotion()) {
+    root.classList.add("is-handwriting-complete");
+    return 0;
+  }
+
+  const duration = wrapHandwrittenNoteText(root);
+  window.setTimeout(() => {
+    root.classList.add("is-handwriting-complete");
+  }, duration);
+  return duration;
+}
+
+function getHandwrittenNoteLeaveDelay(root) {
+  return startHandwrittenNote(root) + handwrittenNoteConfig.afterCompleteDelay;
+}
+
 function isGalleryPage() {
   return window.location.pathname.startsWith("/masonry");
 }
@@ -357,17 +424,18 @@ function showGalleryNoteIntro(options = {}) {
   document.body.appendChild(overlay);
   document.body.classList.add("gallery-note-intro-active");
 
+  const leaveDelay = getHandwrittenNoteLeaveDelay(overlay.querySelector(".gallery-note-paper p"));
   galleryNoteIntroTimer = window.setTimeout(() => {
     ensureGalleryNoteButton();
     setGalleryNoteExitTarget(overlay);
     overlay.classList.add("is-leaving");
-  }, 6500);
+  }, leaveDelay);
 
   galleryNoteIntroCleanupTimer = window.setTimeout(() => {
     overlay.remove();
     document.body.classList.remove("gallery-note-intro-active");
     ensureGalleryNoteButton();
-  }, 7350);
+  }, leaveDelay + 850);
 }
 function hasSeenHomeNoteIntro() {
   try {
@@ -488,15 +556,16 @@ function showHomeNoteIntro() {
   document.body.appendChild(overlay);
   document.body.classList.add("home-note-intro-active");
 
+  const leaveDelay = getHandwrittenNoteLeaveDelay(overlay.querySelector(".home-note-paper p"));
   homeNoteIntroTimer = window.setTimeout(() => {
     overlay.classList.add("is-leaving");
-  }, 5000);
+  }, leaveDelay);
 
   homeNoteIntroCleanupTimer = window.setTimeout(() => {
     overlay.remove();
     document.body.classList.remove("home-note-intro-active");
     exitHomeNotePreroll();
-  }, 5850);
+  }, leaveDelay + 850);
 }
 
 function hasSeenAnalyticsEasterEgg() {
@@ -550,13 +619,14 @@ function showAnalyticsEasterEggNote() {
   const overlay = createAnalyticsEasterEggOverlay();
   document.body.appendChild(overlay);
 
+  const leaveDelay = getHandwrittenNoteLeaveDelay(overlay.querySelector(".analytics-easter-egg-paper p"));
   analyticsEasterEggTimer = window.setTimeout(() => {
     overlay.classList.add("is-leaving");
-  }, 3000);
+  }, leaveDelay);
 
   analyticsEasterEggCleanupTimer = window.setTimeout(() => {
     overlay.remove();
-  }, 3850);
+  }, leaveDelay + 850);
 }
 
 function canPreloadGallery() {
@@ -810,18 +880,22 @@ function showAuthForgotNote() {
   if (!note) return;
 
   window.clearTimeout(authForgotNoteTimer);
+  if (!note.dataset.handwritingSource) note.dataset.handwritingSource = note.textContent || "";
+  note.textContent = note.dataset.handwritingSource;
   note.hidden = false;
   note.classList.remove("is-leaving", "is-visible");
   void note.offsetWidth;
   note.classList.add("is-visible");
 
+  const leaveDelay = getHandwrittenNoteLeaveDelay(note);
   authForgotNoteTimer = window.setTimeout(() => {
     note.classList.add("is-leaving");
     window.setTimeout(() => {
       note.hidden = true;
       note.classList.remove("is-visible", "is-leaving");
+      note.textContent = note.dataset.handwritingSource || "";
     }, 820);
-  }, 5000);
+  }, leaveDelay);
 }
 
 function setAuthEmailStatus(message, isError = false) {
