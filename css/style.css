@@ -7425,6 +7425,20 @@ body.blog-auth-modal-open {
   justify-content: space-between;
   gap: 12px;
 }
+.page-container:has(#guestbook-history-root) .main-content-container {
+  min-height: auto !important;
+  justify-content: flex-start !important;
+}
+.page-container:has(#guestbook-history-root) .main-content-body {
+  padding-top: 18px;
+  padding-bottom: 0;
+}
+.page-container:has(#guestbook-history-root) .main-content-footer {
+  margin-top: 0;
+}
+.page-container:has(#guestbook-history-root) .footer {
+  margin-top: 0 !important;
+}
 .guestbook-history-container {
   width: 100%;
   max-width: 860px;
