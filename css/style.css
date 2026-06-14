@@ -1541,7 +1541,7 @@ pre .deletion {
   top: var(--home-hero-sticky-top, 88px);
   left: var(--home-hero-clone-left, 0px);
   width: var(--home-hero-clone-width, 100vw);
-  z-index: 2;
+  z-index: 1;
   pointer-events: none;
   transform: translateZ(0);
   display: flex;
@@ -1552,6 +1552,12 @@ pre .deletion {
   font-family: 'Chillax-Variable', sans-serif;
   font-weight: 500;
 }
+.home-page-container .main-content-container {
+  position: relative;
+  z-index: 3;
+}
+.home-page-container .main-content-body,
+.home-page-container .main-content,
 .home-page-container .home-content-container,
 .home-page-container .home-sidebar-container,
 .home-page-container .main-content-footer {
