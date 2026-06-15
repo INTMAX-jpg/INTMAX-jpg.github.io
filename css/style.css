@@ -7425,6 +7425,21 @@ body.blog-auth-modal-open {
   justify-content: space-between;
   gap: 12px;
 }
+.comments-page-container .main-content-container,
+.comments-page-container .comments-content-container {
+  min-height: auto !important;
+  justify-content: flex-start !important;
+}
+.comments-page-container .main-content-body {
+  padding-top: 18px;
+  padding-bottom: 0;
+}
+.comments-page-container .main-content-footer {
+  margin-top: 0;
+}
+.comments-page-container .footer {
+  margin-top: 0 !important;
+}
 .page-container:has(#guestbook-history-root) .main-content-container {
   min-height: auto !important;
   justify-content: flex-start !important;
