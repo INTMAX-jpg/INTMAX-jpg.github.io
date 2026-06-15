@@ -211,7 +211,16 @@ declare
   result jsonb;
 begin
   with page_views as (
-    select *
+    select
+      *,
+      case
+        when country is null or btrim(country) = '' or lower(btrim(country)) in ('unknown', 'n/a', 'na', 'null', 'undefined') then null
+        else btrim(country)
+      end as clean_country,
+      case
+        when city is null or btrim(city) = '' or lower(btrim(city)) in ('unknown', 'n/a', 'na', 'null', 'undefined') then null
+        else btrim(city)
+      end as clean_city
     from public.visit_analytics
     where event_type = 'page_view'
   ),
@@ -222,8 +231,11 @@ begin
   ),
   region_summary as (
     select
-      coalesce(nullif(country, ''), 'Unknown') ||
-        case when city is not null and city <> '' then ' / ' || city else '' end as label,
+      coalesce(
+        clean_country || case when clean_city is not null then ' / ' || clean_city else '' end,
+        clean_city,
+        'Unknown'
+      ) as label,
       count(distinct visitor_id) as total
     from page_views
     group by 1
@@ -231,14 +243,14 @@ begin
     limit 12
   ),
   country_summary as (
-    select coalesce(nullif(country, ''), 'Unknown') as label, count(distinct visitor_id) as total
+    select coalesce(clean_country, 'Unknown') as label, count(distinct visitor_id) as total
     from page_views
     group by 1
     order by total desc, label asc
     limit 12
   ),
   city_summary as (
-    select coalesce(nullif(city, ''), 'Unknown') as label, count(distinct visitor_id) as total
+    select coalesce(clean_city, 'Unknown') as label, count(distinct visitor_id) as total
     from page_views
     group by 1
     order by total desc, label asc
@@ -413,7 +425,16 @@ rollup_payload as (
   where (select has_rollup from rollup_exists)
 ),
 page_views as (
-  select *
+  select
+    *,
+    case
+      when country is null or btrim(country) = '' or lower(btrim(country)) in ('unknown', 'n/a', 'na', 'null', 'undefined') then null
+      else btrim(country)
+    end as clean_country,
+    case
+      when city is null or btrim(city) = '' or lower(btrim(city)) in ('unknown', 'n/a', 'na', 'null', 'undefined') then null
+      else btrim(city)
+    end as clean_city
   from public.visit_analytics
   where event_type = 'page_view'
     and not (select has_rollup from rollup_exists)
@@ -428,8 +449,11 @@ visitor_location as (
 ),
 region_summary as (
   select
-    coalesce(nullif(country, ''), 'Unknown') ||
-      case when city is not null and city <> '' then ' / ' || city else '' end as label,
+    coalesce(
+      clean_country || case when clean_city is not null then ' / ' || clean_city else '' end,
+      clean_city,
+      'Unknown'
+    ) as label,
     count(distinct visitor_id) as total
   from page_views
   group by 1

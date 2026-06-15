@@ -58,6 +58,14 @@ function clampText(value: unknown, maxLength: number) {
   return trimmed.slice(0, maxLength);
 }
 
+function cleanGeoText(value: unknown, maxLength: number) {
+  const text = clampText(value, maxLength);
+  if (!text) return null;
+  const normalized = text.toLowerCase();
+  if (["unknown", "unknown/unknown", "n/a", "na", "null", "undefined"].includes(normalized)) return null;
+  return text;
+}
+
 function clampInt(value: unknown, min = 0, max = 100000000) {
   const number = Number(value);
   if (!Number.isFinite(number)) return null;
@@ -135,7 +143,7 @@ function isProbablyPrivateIp(ip: string) {
 }
 
 function hasUsefulGeo(geo: { country?: string | null; region?: string | null; city?: string | null } | null) {
-  return Boolean(geo?.country || geo?.region || geo?.city);
+  return Boolean(cleanGeoText(geo?.country, 120) || cleanGeoText(geo?.region, 120) || cleanGeoText(geo?.city, 120));
 }
 
 async function getCachedGeo(supabase: ReturnType<typeof createClient>, ipHash: string | null) {
@@ -155,9 +163,9 @@ async function getCachedGeo(supabase: ReturnType<typeof createClient>, ipHash: s
     .eq("ip_hash", ipHash);
 
   return {
-    country: clampText(data.country, 120),
-    region: clampText(data.region, 120),
-    city: clampText(data.city, 120),
+    country: cleanGeoText(data.country, 120),
+    region: cleanGeoText(data.region, 120),
+    city: cleanGeoText(data.city, 120),
     countryCode: clampText(data.country_code, 20),
     provider: clampText(data.geo_provider, 80) || "cache",
     metadata: typeof data.metadata === "object" && data.metadata !== null ? data.metadata : {},
@@ -196,9 +204,9 @@ async function lookupIpApiGeo(ip: string) {
     if (data?.status !== "success") return null;
 
     return {
-      country: clampText(data.country, 120),
-      region: clampText(data.regionName || data.region, 120),
-      city: clampText(data.city, 120),
+      country: cleanGeoText(data.country, 120),
+      region: cleanGeoText(data.regionName || data.region, 120),
+      city: cleanGeoText(data.city, 120),
       countryCode: clampText(data.countryCode, 20),
       provider: "ip-api.com",
       metadata: {
@@ -233,9 +241,9 @@ async function cacheGeo(
   await supabase.from("visit_ip_geo_cache").upsert(
     {
       ip_hash: ipHash,
-      country: clampText(geo.country, 120),
-      region: clampText(geo.region, 120),
-      city: clampText(geo.city, 120),
+      country: cleanGeoText(geo.country, 120),
+      region: cleanGeoText(geo.region, 120),
+      city: cleanGeoText(geo.city, 120),
       country_code: clampText(geo.countryCode, 20),
       geo_provider: clampText(geo.provider, 80) || "unknown",
       metadata: geo.metadata || {},
@@ -263,9 +271,9 @@ async function resolveGeo(
   const headerGeo = getHeaderGeo(req);
   if (hasUsefulGeo(headerGeo)) {
     const geo = {
-      country: clampText(headerGeo.country, 120),
-      region: clampText(headerGeo.region, 120),
-      city: clampText(headerGeo.city, 120),
+      country: cleanGeoText(headerGeo.country, 120),
+      region: cleanGeoText(headerGeo.region, 120),
+      city: cleanGeoText(headerGeo.city, 120),
       countryCode: null,
       provider: "request-headers",
       metadata: {},
@@ -347,9 +355,9 @@ Deno.serve(async (req) => {
     page_url: clampText(body.page_url, 1000),
     referrer: clampText(body.referrer, 1000),
     ip_hash: ipHash,
-    country: clampText(geo.country, 120),
-    region: clampText(geo.region, 120),
-    city: clampText(geo.city, 120),
+    country: cleanGeoText(geo.country, 120),
+    region: cleanGeoText(geo.region, 120),
+    city: cleanGeoText(geo.city, 120),
     device_type: pickDeviceType(body.device_type),
     os_name: clampText(body.os_name, 120),
     os_version: clampText(body.os_version, 120),
