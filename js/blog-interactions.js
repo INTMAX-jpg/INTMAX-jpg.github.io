@@ -1728,6 +1728,47 @@ function isCommentsPage() {
   return window.location.pathname.replace(/\/index\.html$/, "/") === "/comments/";
 }
 
+function tightenCommentsPageLayout() {
+  if (!isCommentsPage() && !document.querySelector("#guestbook-history-root")) return;
+
+  const page = document.querySelector(".page-container");
+  const container = document.querySelector(".main-content-container");
+  const body = document.querySelector(".main-content-body");
+  const historyRoot = document.querySelector("#guestbook-history-root");
+  const historyList = document.querySelector(".guestbook-history-list");
+  const footerContainer = document.querySelector(".main-content-footer");
+  const footer = footerContainer?.querySelector(".footer") || document.querySelector(".footer");
+
+  page?.classList.add("comments-page-container");
+
+  if (container) {
+    container.classList.add("comments-content-container");
+    container.classList.remove("justify-between", "min-h-dvh");
+    container.style.display = "block";
+    container.style.minHeight = "auto";
+    container.style.height = "auto";
+    container.style.justifyContent = "flex-start";
+  }
+
+  if (body) {
+    body.style.minHeight = "0";
+    body.style.height = "auto";
+    body.style.alignItems = "flex-start";
+    body.style.paddingBottom = "0";
+    body.style.marginBottom = "0";
+  }
+
+  [historyRoot, historyList].forEach((element) => {
+    if (!element) return;
+    element.style.minHeight = "0";
+    element.style.height = "auto";
+    element.style.flex = "0 0 auto";
+  });
+
+  if (footerContainer) footerContainer.style.marginTop = "0";
+  if (footer) footer.style.marginTop = "0";
+}
+
 function isAnalyticsPage() {
   return window.location.pathname.replace(/\/index\.html$/, "/") === "/analytics/";
 }
@@ -2283,6 +2324,7 @@ async function renderGuestbookHistory() {
   const root = document.querySelector("#guestbook-history-root");
   if (!root) return;
 
+  tightenCommentsPageLayout();
   root.innerHTML = '<div class="guestbook-history-status">正在加载留言...</div>';
 
   try {
@@ -2306,6 +2348,7 @@ async function renderGuestbookHistory() {
       </div>
     `;
 
+    tightenCommentsPageLayout();
     root.querySelector(".guestbook-history-new")?.addEventListener("click", openGuestbookModal);
     root.querySelectorAll("[data-reply-toggle]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -2798,6 +2841,7 @@ function initBlogInteractions() {
   installAnalyticsListeners();
   trackPageView();
   initVisitorCountEasterEgg();
+  tightenCommentsPageLayout();
   scheduleGalleryPreload();
   showGalleryNoteIntro();
   showBirthdayCakeIntro();
