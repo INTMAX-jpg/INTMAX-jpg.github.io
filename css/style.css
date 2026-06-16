@@ -2679,6 +2679,7 @@ html.is-animating .scroll-progress-bar {
   font-size: 1.3rem;
   margin-bottom: 5px;
   cursor: pointer;
+  pointer-events: auto;
   border-right: none;
   border-radius: 12px;
   box-shadow: var(--redefine-box-shadow);
@@ -5611,7 +5612,9 @@ html[data-theme="dark"] .footer .odometer *,
   position: fixed;
   bottom: 5%;
   right: 38px;
+  z-index: 1015;
   opacity: 1;
+  pointer-events: auto;
   transition: opacity 0.2s ease;
 }
 .page-container .right-side-tools-container.hide {
