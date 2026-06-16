@@ -2966,7 +2966,17 @@ function initHomeArticleCardLinks() {
     });
   });
 }
+
+function disableContextMenu() {
+  if (document.documentElement.dataset.contextMenuDisabled === "true") return;
+  document.documentElement.dataset.contextMenuDisabled = "true";
+  document.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+  });
+}
+
 function initBlogInteractions() {
+  disableContextMenu();
   installAnalyticsListeners();
   installDwellTimeListeners();
   startDwellTimeForCurrentPage();
