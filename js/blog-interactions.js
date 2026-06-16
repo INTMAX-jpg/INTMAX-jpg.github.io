@@ -2835,16 +2835,17 @@ function formatDurationMs(value) {
 
 function renderDwellTimePanel(summary) {
   const items = [
-    { label: "Home", value: summary.avg_home_dwell_ms, icon: "fa-solid fa-house" },
-    { label: "Posts", value: summary.avg_post_dwell_ms, icon: "fa-regular fa-newspaper" },
-    { label: "Gallery", value: summary.avg_gallery_dwell_ms, icon: "fa-solid fa-image" },
+    { label: "Home Stay", value: summary.avg_home_dwell_ms, icon: "fa-solid fa-house" },
+    { label: "Post Stay", value: summary.avg_post_dwell_ms, icon: "fa-regular fa-newspaper" },
+    { label: "Gallery Stay", value: summary.avg_gallery_dwell_ms, icon: "fa-solid fa-image" },
+    { label: "Gallery Load", value: summary.avg_gallery_load_ms, icon: "fa-solid fa-gauge-high" },
   ];
 
   return `
     <section class="visitor-analytics-panel visitor-analytics-dwell-panel">
       <div class="visitor-analytics-panel-title">
         <i class="fa-regular fa-clock" aria-hidden="true"></i>
-        <h2>Average Stay Time</h2>
+        <h2>Average Time</h2>
       </div>
       <div class="visitor-analytics-dwell-grid">
         ${items.map((item) => `
