@@ -218,6 +218,10 @@ begin
         else btrim(country)
       end as clean_country,
       case
+        when region is null or btrim(region) = '' or lower(btrim(region)) in ('unknown', 'n/a', 'na', 'null', 'undefined') then null
+        else btrim(region)
+      end as clean_region,
+      case
         when city is null or btrim(city) = '' or lower(btrim(city)) in ('unknown', 'n/a', 'na', 'null', 'undefined') then null
         else btrim(city)
       end as clean_city
@@ -229,18 +233,30 @@ begin
     from public.visit_analytics
     where event_type = 'gallery_load'
   ),
+  visitor_regions as (
+    select distinct on (visitor_id)
+      visitor_id,
+      clean_country,
+      clean_region,
+      clean_city
+    from page_views
+    order by
+      visitor_id,
+      case when clean_country is not null or clean_region is not null or clean_city is not null then 0 else 1 end,
+      created_at desc
+  ),
   region_summary as (
     select
       coalesce(
-        clean_country || case when clean_city is not null then ' / ' || clean_city else '' end,
+        clean_country || case when clean_city is not null then ' / ' || clean_city else case when clean_region is not null then ' / ' || clean_region else '' end end,
+        clean_region || case when clean_city is not null and clean_city <> clean_region then ' / ' || clean_city else '' end,
         clean_city,
         'Unknown'
       ) as label,
-      count(distinct visitor_id) as total
-    from page_views
+      count(*) as total
+    from visitor_regions
     group by 1
     order by total desc, label asc
-    limit 12
   ),
   country_summary as (
     select coalesce(clean_country, 'Unknown') as label, count(distinct visitor_id) as total
@@ -432,6 +448,10 @@ page_views as (
       else btrim(country)
     end as clean_country,
     case
+      when region is null or btrim(region) = '' or lower(btrim(region)) in ('unknown', 'n/a', 'na', 'null', 'undefined') then null
+      else btrim(region)
+    end as clean_region,
+    case
       when city is null or btrim(city) = '' or lower(btrim(city)) in ('unknown', 'n/a', 'na', 'null', 'undefined') then null
       else btrim(city)
     end as clean_city
@@ -447,18 +467,30 @@ visitor_location as (
   order by created_at desc
   limit 1
 ),
+visitor_regions as (
+  select distinct on (visitor_id)
+    visitor_id,
+    clean_country,
+    clean_region,
+    clean_city
+  from page_views
+  order by
+    visitor_id,
+    case when clean_country is not null or clean_region is not null or clean_city is not null then 0 else 1 end,
+    created_at desc
+),
 region_summary as (
   select
     coalesce(
-      clean_country || case when clean_city is not null then ' / ' || clean_city else '' end,
+      clean_country || case when clean_city is not null then ' / ' || clean_city else case when clean_region is not null then ' / ' || clean_region else '' end end,
+      clean_region || case when clean_city is not null and clean_city <> clean_region then ' / ' || clean_city else '' end,
       clean_city,
       'Unknown'
     ) as label,
-    count(distinct visitor_id) as total
-  from page_views
+    count(*) as total
+  from visitor_regions
   group by 1
   order by total desc, label asc
-  limit 12
 ),
 device_summary as (
   select coalesce(nullif(device_type, ''), 'unknown') as label, count(distinct visitor_id) as total
