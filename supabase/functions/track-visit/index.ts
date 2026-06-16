@@ -79,11 +79,17 @@ function pickDeviceType(value: unknown) {
 }
 
 function pickEventType(value: unknown) {
-  return value === "gallery_load" ? "gallery_load" : "page_view";
+  if (value === "gallery_load") return "gallery_load";
+  if (value === "dwell_time") return "dwell_time";
+  return "page_view";
 }
 
 function isEasterEggDiscoveryEvent(value: unknown) {
   return value === "easter_egg_discovery";
+}
+
+function pickDwellPageType(value: unknown) {
+  return ["home", "post", "gallery"].includes(String(value)) ? String(value) : null;
 }
 const botRules = [
   { name: "Bingbot", regex: /bingbot/i },
@@ -375,6 +381,8 @@ Deno.serve(async (req) => {
     gallery_image_total: clampInt(body.gallery_image_total, 0),
     gallery_image_loaded: clampInt(body.gallery_image_loaded, 0),
     gallery_image_failed: clampInt(body.gallery_image_failed, 0),
+    dwell_time_ms: clampInt(body.dwell_time_ms, 1000, 1800000),
+    dwell_page_type: pickDwellPageType(body.dwell_page_type),
     metadata: {
       ...sourceMetadata,
       geo_provider: geo.provider,

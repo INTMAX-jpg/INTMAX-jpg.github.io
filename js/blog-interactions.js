@@ -35,6 +35,14 @@ let galleryPreloadScheduleStarted = false;
 let analyticsListenerInstalled = false;
 let lastTrackedPageKey = "";
 let lastTrackedPageAt = 0;
+const dwellTimeState = {
+  pageKey: "",
+  pagePath: "",
+  pageUrl: "",
+  pageType: null,
+  startedAt: 0,
+  activeMs: 0,
+};
 const galleryNoteIntroStorageKey = "ZIXI_GALLERY_NOTE_INTRO_SEEN";
 const homeNoteIntroStorageKey = "ZIXI_HOME_NOTE_INTRO_SEEN";
 const analyticsEasterEggStorageKey = "ZIXI_ANALYTICS_EASTER_EGG_SEEN";
@@ -117,6 +125,13 @@ function getHandwrittenNoteLeaveDelay(root) {
 
 function isGalleryPage() {
   return window.location.pathname.startsWith("/masonry");
+}
+
+function getDwellPageType(pathname = window.location.pathname) {
+  if (pathname === "/" || pathname === "/index.html") return "home";
+  if (pathname.startsWith("/masonry")) return "gallery";
+  if (/^\/\d{4}\/\d{2}\/\d{2}\//.test(pathname)) return "post";
+  return null;
 }
 
 function createAnalyticsId(prefix) {
@@ -251,6 +266,83 @@ function sendVisitAnalytics(eventType, extra = {}) {
   try {
     postVisitAnalytics(eventType, extra).catch(() => {});
   } catch (error) {}
+}
+
+function resetDwellTimeState() {
+  dwellTimeState.pageKey = "";
+  dwellTimeState.pagePath = "";
+  dwellTimeState.pageUrl = "";
+  dwellTimeState.pageType = null;
+  dwellTimeState.startedAt = 0;
+  dwellTimeState.activeMs = 0;
+}
+
+function accumulateDwellTime(now = Date.now()) {
+  if (!dwellTimeState.pageType || !dwellTimeState.startedAt) return;
+  dwellTimeState.activeMs += Math.max(0, now - dwellTimeState.startedAt);
+  dwellTimeState.startedAt = 0;
+}
+
+function sendDwellTime(reason = "page_change") {
+  if (!dwellTimeState.pageType) return;
+  accumulateDwellTime();
+
+  const dwellMs = Math.round(dwellTimeState.activeMs);
+  const payload = {
+    page_path: dwellTimeState.pagePath,
+    page_url: dwellTimeState.pageUrl,
+    dwell_page_type: dwellTimeState.pageType,
+    dwell_time_ms: dwellMs,
+    metadata: { reason },
+  };
+
+  resetDwellTimeState();
+  if (dwellMs < 1000) return;
+  sendVisitAnalytics("dwell_time", payload);
+}
+
+function startDwellTimeForCurrentPage() {
+  const pageKey = window.location.pathname + window.location.search + window.location.hash;
+  const pageType = getDwellPageType(window.location.pathname);
+
+  if (dwellTimeState.pageKey && dwellTimeState.pageKey !== pageKey) {
+    sendDwellTime("page_change");
+  }
+
+  if (!pageType) {
+    resetDwellTimeState();
+    return;
+  }
+
+  if (dwellTimeState.pageKey === pageKey && dwellTimeState.pageType === pageType) {
+    if (!dwellTimeState.startedAt && document.visibilityState !== "hidden") {
+      dwellTimeState.startedAt = Date.now();
+    }
+    return;
+  }
+
+  dwellTimeState.pageKey = pageKey;
+  dwellTimeState.pagePath = pageKey;
+  dwellTimeState.pageUrl = window.location.href;
+  dwellTimeState.pageType = pageType;
+  dwellTimeState.activeMs = 0;
+  dwellTimeState.startedAt = document.visibilityState === "hidden" ? 0 : Date.now();
+}
+
+function installDwellTimeListeners() {
+  if (document.documentElement.dataset.dwellTimeBound === "true") return;
+  document.documentElement.dataset.dwellTimeBound = "true";
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      sendDwellTime("hidden");
+      return;
+    }
+    startDwellTimeForCurrentPage();
+  });
+
+  window.addEventListener("pagehide", () => sendDwellTime("pagehide"));
+  window.addEventListener("beforeunload", () => sendDwellTime("beforeunload"));
 }
 
 async function registerEasterEggDiscovery() {
@@ -2730,6 +2822,42 @@ function renderAnalyticsBars(title, items, iconClass) {
   `;
 }
 
+function formatDurationMs(value) {
+  const ms = Math.max(0, Number(value) || 0);
+  if (!ms) return "No data";
+  const totalSeconds = Math.max(1, Math.round(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (!minutes) return `${seconds}s`;
+  if (!seconds) return `${minutes}min`;
+  return `${minutes}min ${seconds}s`;
+}
+
+function renderDwellTimePanel(summary) {
+  const items = [
+    { label: "Home", value: summary.avg_home_dwell_ms, icon: "fa-solid fa-house" },
+    { label: "Posts", value: summary.avg_post_dwell_ms, icon: "fa-regular fa-newspaper" },
+    { label: "Gallery", value: summary.avg_gallery_dwell_ms, icon: "fa-solid fa-image" },
+  ];
+
+  return `
+    <section class="visitor-analytics-panel visitor-analytics-dwell-panel">
+      <div class="visitor-analytics-panel-title">
+        <i class="fa-regular fa-clock" aria-hidden="true"></i>
+        <h2>Average Stay Time</h2>
+      </div>
+      <div class="visitor-analytics-dwell-grid">
+        ${items.map((item) => `
+          <div class="visitor-analytics-dwell-item">
+            <span><i class="${item.icon}" aria-hidden="true"></i>${escapeHTML(item.label)}</span>
+            <strong>${escapeHTML(formatDurationMs(item.value))}</strong>
+          </div>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
 async function fetchVisitorAnalyticsSummary() {
   const supabase = await getSupabaseClient();
   const { data, error } = await supabase.rpc("get_visit_analytics_summary", {
@@ -2765,6 +2893,7 @@ function renderVisitorAnalyticsSummary(summary, discovery = {}) {
         </div>
       </div>
     </section>
+    ${renderDwellTimePanel(summary)}
     <div class="visitor-analytics-grid">
       ${renderAnalyticsBars("Regions", summary.regions, "fa-solid fa-location-dot")}
       ${renderAnalyticsBars("Browsers", summary.browsers, "fa-regular fa-window-maximize")}
@@ -2839,6 +2968,8 @@ function initHomeArticleCardLinks() {
 }
 function initBlogInteractions() {
   installAnalyticsListeners();
+  installDwellTimeListeners();
+  startDwellTimeForCurrentPage();
   trackPageView();
   initVisitorCountEasterEgg();
   tightenCommentsPageLayout();
