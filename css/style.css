@@ -7437,7 +7437,7 @@ body.blog-auth-modal-open {
   height: auto !important;
   align-items: flex-start !important;
   padding-top: 18px;
-  padding-bottom: 0;
+  padding-bottom: clamp(64px, 8vh, 96px);
 }
 .comments-page-container .guestbook-history-container,
 .comments-page-container .guestbook-history-list {
@@ -7462,7 +7462,7 @@ body.blog-auth-modal-open {
   height: auto !important;
   align-items: flex-start !important;
   padding-top: 18px;
-  padding-bottom: 0;
+  padding-bottom: clamp(64px, 8vh, 96px);
 }
 .page-container:has(#guestbook-history-root) .guestbook-history-container,
 .page-container:has(#guestbook-history-root) .guestbook-history-list {
