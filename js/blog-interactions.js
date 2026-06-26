@@ -15,6 +15,7 @@ const authorEditorConfig = {
   branch: "main",
   manifestPath: "data/zixi-posts/manifest.json",
   sourceDir: "data/zixi-posts",
+  imageDir: "images/post-assets",
 };
 
 const authConfig = {
@@ -1355,6 +1356,7 @@ function injectAuthorEditorModal() {
   modal.querySelector(".blog-author-slug-input")?.addEventListener("input", (event) => {
     event.currentTarget.dataset.edited = "true";
   });
+  modal.querySelector(".blog-author-markdown-input")?.addEventListener("paste", handleAuthorMarkdownPaste);
   modal.querySelectorAll("[data-author-visibility]").forEach((button) => {
     button.addEventListener("click", () => setAuthorVisibility(button.dataset.authorVisibility || "visible"));
   });
@@ -1451,6 +1453,85 @@ function getEditorValues() {
   if (!markdown.trim()) throw new Error("Please write some Markdown content.");
 
   return { title, slug, markdown, visibility };
+}
+
+function getCurrentAuthorSlug() {
+  const modal = document.querySelector(".blog-author-modal");
+  const title = modal?.querySelector(".blog-author-title-input")?.value.trim() || "";
+  const slugValue = modal?.querySelector(".blog-author-slug-input")?.value.trim() || "";
+  return slugifyPostTitle(slugValue || title || activeAuthorPost?.slug || "draft");
+}
+
+function getImageExtension(file) {
+  const nameMatch = String(file?.name || "").toLowerCase().match(/\.([a-z0-9]+)$/);
+  const ext = nameMatch?.[1];
+  if (ext && /^(png|jpe?g|gif|webp|avif|svg)$/.test(ext)) return ext === "jpeg" ? "jpg" : ext;
+  const mime = String(file?.type || "").toLowerCase();
+  if (mime.includes("png")) return "png";
+  if (mime.includes("jpeg") || mime.includes("jpg")) return "jpg";
+  if (mime.includes("gif")) return "gif";
+  if (mime.includes("webp")) return "webp";
+  if (mime.includes("avif")) return "avif";
+  if (mime.includes("svg")) return "svg";
+  return "png";
+}
+
+function getPastedImageAlt(file, fallback = "image") {
+  const name = String(file?.name || "").replace(/\.[^.]+$/, "").trim();
+  return name ? name.replace(/[|\n\r[\]()]/g, " ").replace(/\s+/g, " ").slice(0, 80) : fallback;
+}
+
+function buildPastedImagePath(file, index) {
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, "0");
+  const slug = getCurrentAuthorSlug();
+  const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const random = Math.random().toString(36).slice(2, 8);
+  const ext = getImageExtension(file);
+  return `${authorEditorConfig.imageDir}/${now.getFullYear()}/${pad(now.getMonth() + 1)}/${pad(now.getDate())}/${slug}-${stamp}-${index + 1}-${random}.${ext}`;
+}
+
+async function fileToBase64(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.slice(index, index + chunkSize));
+  }
+  return btoa(binary);
+}
+
+function insertTextAtTextareaSelection(textarea, text) {
+  const start = textarea.selectionStart ?? textarea.value.length;
+  const end = textarea.selectionEnd ?? start;
+  const before = textarea.value.slice(0, start);
+  const after = textarea.value.slice(end);
+  const prefix = before && !before.endsWith("\n") ? "\n" : "";
+  const suffix = after && !after.startsWith("\n") ? "\n" : "";
+  textarea.setRangeText(`${prefix}${text}${suffix}`, start, end, "end");
+  textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  textarea.focus();
+}
+
+function replaceTextareaText(textarea, fromText, toText) {
+  const index = textarea.value.indexOf(fromText);
+  if (index === -1) return false;
+  textarea.setRangeText(toText, index, index + fromText.length, "end");
+  textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  return true;
+}
+
+function collectPastedImageFiles(event) {
+  const items = Array.from(event.clipboardData?.items || []);
+  const itemFiles = items
+    .filter((item) => item.kind === "file" && item.type?.startsWith("image/"))
+    .map((item) => item.getAsFile())
+    .filter(Boolean);
+  const directFiles = Array.from(event.clipboardData?.files || [])
+    .filter((file) => file.type?.startsWith("image/"));
+  return [...itemFiles, ...directFiles].filter((file, index, files) => (
+    files.findIndex((candidate) => candidate.name === file.name && candidate.size === file.size && candidate.type === file.type) === index
+  ));
 }
 
 function inlineMarkdown(value) {
@@ -1785,10 +1866,10 @@ function buildPostHtml(post, articleHtml) {
 `;
 }
 
-async function createGitBlob(content) {
+async function createGitBlob(content, encoding = "utf-8") {
   const data = await githubRequest(`/repos/${authorEditorConfig.owner}/${authorEditorConfig.repo}/git/blobs`, {
     method: "POST",
-    body: JSON.stringify({ content, encoding: "utf-8" }),
+    body: JSON.stringify({ content, encoding }),
   });
   return data.sha;
 }
@@ -1804,7 +1885,7 @@ async function commitFilesToGithub(files, message) {
       treeEntries.push({ path: file.path, mode: "100644", type: "blob", sha: null });
       continue;
     }
-    const sha = await createGitBlob(file.content);
+    const sha = await createGitBlob(file.content, file.encoding || "utf-8");
     treeEntries.push({ path: file.path, mode: "100644", type: "blob", sha });
   }
 
@@ -1821,6 +1902,57 @@ async function commitFilesToGithub(files, message) {
     body: JSON.stringify({ sha: commit.sha }),
   });
   return commit;
+}
+
+async function handleAuthorMarkdownPaste(event) {
+  const files = collectPastedImageFiles(event);
+  if (!files.length) return;
+
+  event.preventDefault();
+  const textarea = event.currentTarget;
+
+  if (!authorSessionState.allowed) {
+    setAuthorStatus("Only INTMAX-jpg can upload pasted images.", true);
+    return;
+  }
+  if (!authorSessionState.token) {
+    setAuthorStatus("GitHub write token is missing. Please sign out, then sign in with GitHub again and approve repository access.", true);
+    return;
+  }
+
+  const placeholderId = Date.now().toString(36);
+  const placeholders = files.map((file, index) => `![uploading ${getPastedImageAlt(file, `image-${index + 1}`)}](uploading-github-image-${placeholderId}-${index + 1})`);
+  insertTextAtTextareaSelection(textarea, placeholders.join("\n"));
+  setAuthorStatus(`Uploading ${files.length} pasted image${files.length > 1 ? "s" : ""} to GitHub...`);
+
+  try {
+    const uploads = await Promise.all(files.map(async (file, index) => {
+      const path = buildPastedImagePath(file, index);
+      const content = await fileToBase64(file);
+      return {
+        path,
+        content,
+        encoding: "base64",
+        markdown: `![${getPastedImageAlt(file, `image-${index + 1}`)}](/${path})`,
+      };
+    }));
+
+    const commit = await commitFilesToGithub(
+      uploads.map(({ path, content, encoding }) => ({ path, content, encoding })),
+      `Upload pasted post image${uploads.length > 1 ? "s" : ""}: ${getCurrentAuthorSlug()}`,
+    );
+
+    uploads.forEach((upload, index) => {
+      replaceTextareaText(textarea, placeholders[index], upload.markdown);
+    });
+    setAuthorStatus(`Image upload committed ${commit.sha.slice(0, 7)}. GitHub Pages may need a moment to serve the file.`);
+  } catch (error) {
+    console.warn("Pasted image upload failed", error);
+    placeholders.forEach((placeholder) => {
+      replaceTextareaText(textarea, placeholder, "");
+    });
+    setAuthorStatus(error.message || "Image upload failed.", true);
+  }
 }
 
 async function saveAuthorPost() {
