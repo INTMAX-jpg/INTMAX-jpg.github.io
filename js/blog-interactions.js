@@ -1800,6 +1800,10 @@ async function commitFilesToGithub(files, message) {
   const treeEntries = [];
 
   for (const file of files) {
+    if (file.delete) {
+      treeEntries.push({ path: file.path, mode: "100644", type: "blob", sha: null });
+      continue;
+    }
     const sha = await createGitBlob(file.content);
     treeEntries.push({ path: file.path, mode: "100644", type: "blob", sha });
   }
@@ -1858,6 +1862,8 @@ async function saveAuthorPost() {
 
     if (values.visibility === "visible") {
       files.push({ path: htmlPath, content: buildPostHtml(post, markdownToHtml(values.markdown)) });
+    } else if (activeAuthorPost?.htmlPath) {
+      files.push({ path: activeAuthorPost.htmlPath, delete: true });
     }
 
     const commit = await commitFilesToGithub(files, `Save post: ${values.title}`);
