@@ -9,6 +9,14 @@ const interactionConfig = {
   siteCommentLikesTable: "site_comment_likes",
 };
 
+const authorEditorConfig = {
+  owner: "INTMAX-jpg",
+  repo: "INTMAX-jpg.github.io",
+  branch: "main",
+  manifestPath: "data/zixi-posts/manifest.json",
+  sourceDir: "data/zixi-posts",
+};
+
 const authConfig = {
   supabaseUrl: "https://lfjmmzvabkpneglaevvi.supabase.co",
   supabaseKey: "sb_publishable_H5yhsQ854nw7VJuQXS1EJg_PYdGaMyC",
@@ -31,6 +39,8 @@ let currentSession = null;
 let authInitialized = false;
 let authListenerInitialized = false;
 let activePostContext = null;
+let authorSessionState = { allowed: false, token: "", login: "", checkedToken: "" };
+let activeAuthorPost = null;
 let galleryPreloadScheduleStarted = false;
 let analyticsListenerInstalled = false;
 let lastTrackedPageKey = "";
@@ -836,18 +846,44 @@ function createAuthControlItem(className) {
   return item;
 }
 
+function createAuthorControlItem(className) {
+  const item = document.createElement("li");
+  item.className = className;
+  item.hidden = true;
+  item.innerHTML = `
+    <button class="blog-author-tool-button" type="button" data-author-action="new-post" aria-label="Write a new post" title="Write a new post">
+      <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
+    </button>
+    <button class="blog-author-tool-button" type="button" data-author-action="invisible-posts" aria-label="Invisible posts" title="Invisible posts">
+      <i class="fa-regular fa-folder-open" aria-hidden="true"></i>
+    </button>
+  `;
+
+  item.querySelector('[data-author-action="new-post"]')?.addEventListener("click", () => openAuthorEditor());
+  item.querySelector('[data-author-action="invisible-posts"]')?.addEventListener("click", openInvisiblePostDirectory);
+  return item;
+}
+
 function injectAuthControls() {
   injectAuthModal();
+  injectAuthorEditorModal();
 
   const navbarList = document.querySelector(".navbar-list");
   if (navbarList && !document.querySelector(".blog-auth-nav")) {
     navbarList.appendChild(createAuthControlItem("navbar-item blog-auth-nav"));
+  }
+  if (navbarList && !document.querySelector(".blog-author-tools-nav")) {
+    navbarList.appendChild(createAuthorControlItem("navbar-item blog-author-tools blog-author-tools-nav"));
   }
 
   const drawerList = document.querySelector(".drawer-navbar-list");
   if (drawerList && !document.querySelector(".blog-auth-drawer")) {
     drawerList.appendChild(createAuthControlItem("drawer-navbar-item text-base my-1.5 flex flex-col w-full blog-auth-drawer"));
   }
+  if (drawerList && !document.querySelector(".blog-author-tools-drawer")) {
+    drawerList.appendChild(createAuthorControlItem("drawer-navbar-item text-base my-1.5 flex flex-row gap-2 w-full blog-author-tools blog-author-tools-drawer"));
+  }
+  updateAuthorToolVisibility();
 }
 
 async function handleAuthButtonClick(event) {
@@ -1141,7 +1177,7 @@ async function signInWithGitHub() {
     provider: "github",
     options: {
       redirectTo: getAuthRedirectUrl(),
-      scopes: "read:user user:email",
+      scopes: "public_repo read:user user:email",
     },
   });
 }
@@ -1164,6 +1200,7 @@ function updateAuthUI(session) {
   if (!authButtons.length) return;
 
   if (!user) {
+    setAuthorSessionState({ allowed: false, token: "", login: "", checkedToken: "" });
     authButtons.forEach((button) => {
       button.dataset.authAction = "sign-in";
       button.classList.remove("is-signed-in");
@@ -1201,6 +1238,678 @@ function updateAuthUI(session) {
     avatarNode.textContent = avatar ? "" : name.slice(0, 1).toUpperCase();
     avatarNode.style.backgroundImage = avatar ? `url("${avatar}")` : "";
   });
+  refreshAuthorAccess(session);
+}
+
+function getGithubLoginFromUser(user) {
+  if (!user) return "";
+  return String(
+    user.user_metadata?.user_name ||
+    user.user_metadata?.preferred_username ||
+    user.user_metadata?.login ||
+    "",
+  ).trim();
+}
+
+function isGithubProviderSession(session) {
+  const appMeta = session?.user?.app_metadata || {};
+  const providers = Array.isArray(appMeta.providers) ? appMeta.providers : [];
+  return appMeta.provider === "github" || providers.includes("github");
+}
+
+function updateAuthorToolVisibility() {
+  document.querySelectorAll(".blog-author-tools").forEach((item) => {
+    item.hidden = !authorSessionState.allowed;
+  });
+}
+
+function setAuthorSessionState(nextState) {
+  authorSessionState = { ...authorSessionState, ...nextState };
+  updateAuthorToolVisibility();
+}
+
+async function refreshAuthorAccess(session) {
+  const login = getGithubLoginFromUser(session?.user);
+  const isOwnerMetadata = isGithubProviderSession(session) && login.toLowerCase() === authorEditorConfig.owner.toLowerCase();
+  const token = session?.provider_token || "";
+
+  if (!isOwnerMetadata) {
+    setAuthorSessionState({ allowed: false, token: "", login: "", checkedToken: "" });
+    return;
+  }
+
+  setAuthorSessionState({ allowed: true, token, login });
+
+  if (!token || authorSessionState.checkedToken === token) return;
+  try {
+    const data = await githubRequest("/user", { token });
+    const verifiedLogin = String(data?.login || "").trim();
+    setAuthorSessionState({
+      allowed: verifiedLogin.toLowerCase() === authorEditorConfig.owner.toLowerCase(),
+      token,
+      login: verifiedLogin || login,
+      checkedToken: token,
+    });
+  } catch (error) {
+    console.warn("GitHub owner verification failed", error);
+    setAuthorSessionState({ allowed: false, token: "", login: "", checkedToken: "" });
+  }
+}
+
+function injectAuthorEditorModal() {
+  if (document.querySelector(".blog-author-modal")) return;
+
+  const modal = document.createElement("div");
+  modal.className = "blog-author-modal";
+  modal.hidden = true;
+  modal.innerHTML = `
+    <div class="blog-author-modal-backdrop" data-author-close></div>
+    <section class="blog-author-panel" role="dialog" aria-modal="true" aria-labelledby="blog-author-title">
+      <button class="blog-author-close" type="button" data-author-close aria-label="Close author editor">
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+      </button>
+      <div class="blog-author-panel-header">
+        <span class="blog-author-panel-icon" aria-hidden="true"><i class="fa-regular fa-pen-to-square"></i></span>
+        <div>
+          <h2 id="blog-author-title">Markdown Editor</h2>
+          <p>Write, preview, and commit posts to GitHub.</p>
+        </div>
+      </div>
+      <div class="blog-author-fields">
+        <label>
+          <span>Title</span>
+          <input class="blog-author-title-input" type="text" maxlength="120" placeholder="Post title">
+        </label>
+        <label>
+          <span>Slug</span>
+          <input class="blog-author-slug-input" type="text" maxlength="90" placeholder="auto-generated-from-title">
+        </label>
+        <div class="blog-author-visibility" role="radiogroup" aria-label="Post visibility">
+          <button class="is-active" type="button" data-author-visibility="visible" aria-pressed="true">visible</button>
+          <button type="button" data-author-visibility="invisible" aria-pressed="false">invisible</button>
+        </div>
+        <div class="blog-author-editor-shell">
+          <textarea class="blog-author-markdown-input" rows="16" spellcheck="true" placeholder="# Start writing..."></textarea>
+          <div class="blog-author-preview markdown-body" hidden></div>
+        </div>
+        <div class="blog-author-actions">
+          <button class="blog-author-secondary" type="button" data-author-preview>
+            <i class="fa-regular fa-eye" aria-hidden="true"></i>
+            <span>Preview</span>
+          </button>
+          <button class="blog-author-primary" type="button" data-author-save>
+            <i class="fa-regular fa-code-commit" aria-hidden="true"></i>
+            <span>保存并commit</span>
+          </button>
+        </div>
+        <p class="blog-author-status" role="status"></p>
+      </div>
+    </section>
+  `;
+
+  document.body.appendChild(modal);
+  modal.querySelectorAll("[data-author-close]").forEach((node) => {
+    node.addEventListener("click", closeAuthorEditor);
+  });
+  modal.querySelector(".blog-author-title-input")?.addEventListener("input", syncSlugFromTitle);
+  modal.querySelector(".blog-author-slug-input")?.addEventListener("input", (event) => {
+    event.currentTarget.dataset.edited = "true";
+  });
+  modal.querySelectorAll("[data-author-visibility]").forEach((button) => {
+    button.addEventListener("click", () => setAuthorVisibility(button.dataset.authorVisibility || "visible"));
+  });
+  modal.querySelector("[data-author-preview]")?.addEventListener("click", toggleAuthorPreview);
+  modal.querySelector("[data-author-save]")?.addEventListener("click", saveAuthorPost);
+}
+
+function openAuthorEditor(post = null) {
+  if (!authorSessionState.allowed) return;
+  injectAuthorEditorModal();
+  activeAuthorPost = post;
+
+  const modal = document.querySelector(".blog-author-modal");
+  if (!modal) return;
+  modal.querySelector(".blog-author-directory")?.remove();
+  const titleInput = modal.querySelector(".blog-author-title-input");
+  const slugInput = modal.querySelector(".blog-author-slug-input");
+  const markdownInput = modal.querySelector(".blog-author-markdown-input");
+  const preview = modal.querySelector(".blog-author-preview");
+
+  titleInput.value = post?.title || "";
+  slugInput.value = post?.slug || "";
+  slugInput.dataset.edited = post?.slug ? "true" : "false";
+  markdownInput.value = post?.markdown || "";
+  if (preview) {
+    preview.hidden = true;
+    preview.innerHTML = "";
+  }
+  setAuthorVisibility(post?.visibility || "visible");
+  setAuthorStatus("");
+
+  modal.hidden = false;
+  document.body.classList.add("blog-author-modal-open");
+  titleInput.focus();
+}
+
+function closeAuthorEditor() {
+  const modal = document.querySelector(".blog-author-modal");
+  if (!modal) return;
+  modal.hidden = true;
+  document.body.classList.remove("blog-author-modal-open");
+}
+
+function setAuthorStatus(message, isError = false) {
+  const status = document.querySelector(".blog-author-status");
+  if (!status) return;
+  status.textContent = message;
+  status.classList.toggle("is-error", isError);
+}
+
+function setAuthorVisibility(value) {
+  const visibility = value === "invisible" ? "invisible" : "visible";
+  document.querySelectorAll("[data-author-visibility]").forEach((button) => {
+    const active = button.dataset.authorVisibility === visibility;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  });
+}
+
+function getAuthorVisibility() {
+  const active = document.querySelector("[data-author-visibility].is-active");
+  return active?.dataset.authorVisibility === "invisible" ? "invisible" : "visible";
+}
+
+function slugifyPostTitle(value) {
+  const ascii = value
+    .trim()
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+  return ascii || `post-${new Date().toISOString().slice(0, 10)}`;
+}
+
+function syncSlugFromTitle() {
+  const modal = document.querySelector(".blog-author-modal");
+  const slugInput = modal?.querySelector(".blog-author-slug-input");
+  const titleInput = modal?.querySelector(".blog-author-title-input");
+  if (!slugInput || !titleInput || slugInput.dataset.edited === "true") return;
+  slugInput.value = slugifyPostTitle(titleInput.value);
+}
+
+function getEditorValues() {
+  const modal = document.querySelector(".blog-author-modal");
+  const title = modal?.querySelector(".blog-author-title-input")?.value.trim() || "";
+  const slugValue = modal?.querySelector(".blog-author-slug-input")?.value.trim() || "";
+  const markdown = modal?.querySelector(".blog-author-markdown-input")?.value || "";
+  const slug = slugifyPostTitle(slugValue || title);
+  const visibility = getAuthorVisibility();
+
+  if (!title) throw new Error("Please enter a title.");
+  if (!markdown.trim()) throw new Error("Please write some Markdown content.");
+
+  return { title, slug, markdown, visibility };
+}
+
+function inlineMarkdown(value) {
+  return escapeHTML(value)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2">')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a class="link" target="_blank" rel="noopener" href="$2">$1<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a>');
+}
+
+function markdownToHtml(markdown) {
+  const lines = String(markdown || "").replace(/\r\n/g, "\n").split("\n");
+  const html = [];
+  let paragraph = [];
+  let listOpen = false;
+  let quoteOpen = false;
+  let codeOpen = false;
+  let codeLines = [];
+
+  const flushParagraph = () => {
+    if (!paragraph.length) return;
+    html.push(`<p>${inlineMarkdown(paragraph.join(" "))}</p>`);
+    paragraph = [];
+  };
+  const closeList = () => {
+    if (!listOpen) return;
+    html.push("</ul>");
+    listOpen = false;
+  };
+  const closeQuote = () => {
+    if (!quoteOpen) return;
+    html.push("</blockquote>");
+    quoteOpen = false;
+  };
+
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("```")) {
+      if (codeOpen) {
+        html.push(`<pre><code>${escapeHTML(codeLines.join("\n"))}</code></pre>`);
+        codeLines = [];
+        codeOpen = false;
+      } else {
+        flushParagraph();
+        closeList();
+        closeQuote();
+        codeOpen = true;
+      }
+      return;
+    }
+    if (codeOpen) {
+      codeLines.push(line);
+      return;
+    }
+    if (!trimmed) {
+      flushParagraph();
+      closeList();
+      closeQuote();
+      return;
+    }
+    const heading = trimmed.match(/^(#{1,6})\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      closeList();
+      closeQuote();
+      html.push(`<h${heading[1].length}>${inlineMarkdown(heading[2])}</h${heading[1].length}>`);
+      return;
+    }
+    const listItem = trimmed.match(/^[-*]\s+(.+)$/);
+    if (listItem) {
+      flushParagraph();
+      closeQuote();
+      if (!listOpen) {
+        html.push("<ul>");
+        listOpen = true;
+      }
+      html.push(`<li>${inlineMarkdown(listItem[1])}</li>`);
+      return;
+    }
+    if (trimmed.startsWith(">")) {
+      flushParagraph();
+      closeList();
+      if (!quoteOpen) {
+        html.push("<blockquote>");
+        quoteOpen = true;
+      }
+      html.push(`<p>${inlineMarkdown(trimmed.replace(/^>\s?/, ""))}</p>`);
+      return;
+    }
+    paragraph.push(trimmed);
+  });
+
+  if (codeOpen) html.push(`<pre><code>${escapeHTML(codeLines.join("\n"))}</code></pre>`);
+  flushParagraph();
+  closeList();
+  closeQuote();
+  return html.join("\n");
+}
+
+function toggleAuthorPreview() {
+  const modal = document.querySelector(".blog-author-modal");
+  const preview = modal?.querySelector(".blog-author-preview");
+  const textarea = modal?.querySelector(".blog-author-markdown-input");
+  if (!preview || !textarea) return;
+  const willShow = preview.hidden;
+  preview.hidden = !willShow;
+  textarea.hidden = willShow;
+  if (willShow) preview.innerHTML = markdownToHtml(textarea.value);
+  const label = modal.querySelector("[data-author-preview] span");
+  if (label) label.textContent = willShow ? "Edit" : "Preview";
+}
+
+function createExcerpt(markdown) {
+  return String(markdown || "")
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/[#>*_`[\]()!-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 180);
+}
+
+function formatPostDate(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function formatPostDateTime(date) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function buildPostPath(date, slug) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())}/${slug}/`;
+}
+
+function buildSourcePath(date, slug) {
+  return `${authorEditorConfig.sourceDir}/${formatPostDate(date)}-${slug}.md`;
+}
+
+function buildHomeArticleCard(post) {
+  const href = `/${post.path}`;
+  return `
+    <li class="home-article-item" data-author-post-id="${escapeHTML(post.id)}">
+      <div class="flex flex-col gap-5 px-7 pb-7 pt-7">
+        <h3 class="home-article-title">
+          <a href="${escapeHTML(href)}">${escapeHTML(post.title)}</a>
+        </h3>
+        <div class="home-article-content markdown-body">${escapeHTML(post.excerpt || "").replace(/\n/g, "<br>")}${post.excerpt ? "..." : ""}</div>
+        <div class="home-article-meta-info-container">
+          <div class="home-article-meta-info">
+            <span><i class="fa-solid fa-calendars"></i>&nbsp;<span class="home-article-date" data-date="${escapeHTML(post.createdAt)}">${escapeHTML(post.date)}</span></span>
+          </div>
+          <a href="${escapeHTML(href)}">Read more<span class="seo-reader-text">${escapeHTML(post.title)}</span>&nbsp;<i class="fa-solid fa-angle-right"></i></a>
+        </div>
+      </div>
+    </li>
+  `;
+}
+
+async function loadPublicPostManifest() {
+  try {
+    const response = await fetch(`/${authorEditorConfig.manifestPath}?v=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) return { version: 1, posts: [] };
+    const data = await response.json();
+    return { version: 1, posts: Array.isArray(data.posts) ? data.posts : [] };
+  } catch (error) {
+    return { version: 1, posts: [] };
+  }
+}
+
+async function injectDynamicVisiblePosts() {
+  const list = document.querySelector(".home-article-list");
+  if (!list || list.dataset.dynamicPostsLoaded === "true") return;
+  list.dataset.dynamicPostsLoaded = "true";
+
+  const manifest = await loadPublicPostManifest();
+  const visiblePosts = manifest.posts
+    .filter((post) => post.visibility === "visible" && post.path && post.title)
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+  if (!visiblePosts.length) return;
+
+  const existingLinks = new Set(Array.from(list.querySelectorAll("a[href]")).map((link) => link.getAttribute("href")));
+  visiblePosts.reverse().forEach((post) => {
+    const href = `/${post.path}`;
+    if (existingLinks.has(href)) return;
+    list.insertAdjacentHTML("afterbegin", buildHomeArticleCard(post));
+  });
+  initHomeArticleCardLinks();
+}
+
+function githubHeaders(token) {
+  return {
+    Accept: "application/vnd.github+json",
+    Authorization: `Bearer ${token}`,
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+}
+
+async function githubRequest(path, options = {}) {
+  const token = options.token || authorSessionState.token;
+  if (!token) throw new Error("GitHub token is missing. Please sign in with GitHub again.");
+  const response = await fetch(`https://api.github.com${path}`, {
+    ...options,
+    headers: {
+      ...githubHeaders(token),
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(options.headers || {}),
+    },
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data?.message || `GitHub request failed: ${response.status}`);
+  return data;
+}
+
+async function loadGithubTextFile(path) {
+  const encodedPath = path.split("/").map(encodeURIComponent).join("/");
+  try {
+    const data = await githubRequest(`/repos/${authorEditorConfig.owner}/${authorEditorConfig.repo}/contents/${encodedPath}?ref=${authorEditorConfig.branch}`);
+    if (!data?.content) return "";
+    const binary = atob(String(data.content).replace(/\s/g, ""));
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  } catch (error) {
+    if (/not found/i.test(error.message || "")) return "";
+    throw error;
+  }
+}
+
+async function loadGithubManifest() {
+  const text = await loadGithubTextFile(authorEditorConfig.manifestPath);
+  if (!text) return { version: 1, posts: [] };
+  try {
+    const data = JSON.parse(text);
+    return { version: 1, posts: Array.isArray(data.posts) ? data.posts : [] };
+  } catch (error) {
+    return { version: 1, posts: [] };
+  }
+}
+
+function buildPostHtml(post, articleHtml) {
+  const createdText = formatPostDateTime(new Date(post.createdAt));
+  const updatedText = formatPostDateTime(new Date(post.updatedAt));
+  const url = `https://intmax-jpg.github.io/${post.path}`;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="author" content="Zixi">
+  <meta name="description" content="${escapeHTML(post.excerpt || "Zixi personal blog post.")}">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="${escapeHTML(post.title)}">
+  <meta property="og:url" content="${escapeHTML(url)}">
+  <meta property="og:image" content="https://intmax-jpg.github.io/images/photo.jpg">
+  <meta property="article:published_time" content="${escapeHTML(post.createdAt)}">
+  <meta property="article:modified_time" content="${escapeHTML(post.updatedAt)}">
+  <title>${escapeHTML(post.title)} | Zixi</title>
+  <link rel="icon" type="image/png" href="/images/photo.jpg" sizes="192x192">
+  <link rel="stylesheet" href="/fonts/Chillax/chillax.css">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/build/tailwind.css">
+  <link rel="stylesheet" href="/fonts/GeistMono/geist-mono.css">
+  <link rel="stylesheet" href="/fonts/Geist/geist.css">
+  <link rel="stylesheet" href="/fontawesome/fontawesome.min.css">
+  <link rel="stylesheet" href="/fontawesome/brands.min.css">
+  <link rel="stylesheet" href="/fontawesome/solid.min.css">
+  <link rel="stylesheet" href="/fontawesome/regular.min.css">
+</head>
+<body>
+<main class="page-container" id="swup">
+  <div class="main-content-container flex flex-col justify-between min-h-dvh">
+    <div class="main-content-header">
+      <header class="navbar-container px-6 md:px-12">
+        <div class="navbar-content transition-navbar">
+          <div class="left"><a class="logo-title" href="/">Zixi</a></div>
+          <div class="right"><div class="desktop"><ul class="navbar-list">
+            <li class="navbar-item"><a href="/"><i class="fa-regular fa-house fa-fw"></i> HOME</a></li>
+            <li class="navbar-item"><a href="/masonry/"><i class="fa-solid fa-image fa-fw"></i> Gallery</a></li>
+          </ul></div><div class="mobile"><div class="icon-item navbar-bar"><div class="navbar-bar-middle"></div></div></div></div>
+        </div>
+        <div class="navbar-drawer h-dvh w-full absolute top-0 left-0 bg-background-color flex flex-col justify-between">
+          <ul class="drawer-navbar-list flex flex-col px-4 justify-center items-start">
+            <li class="drawer-navbar-item text-base my-1.5 flex flex-col w-full"><a class="py-1.5 px-2 flex flex-row items-center justify-between gap-1 text-2xl font-semibold group border-b border-border-color w-full" href="/"><span>HOME</span><i class="fa-regular fa-house fa-sm fa-fw"></i></a></li>
+            <li class="drawer-navbar-item text-base my-1.5 flex flex-col w-full"><a class="py-1.5 px-2 flex flex-row items-center justify-between gap-1 text-2xl font-semibold group border-b border-border-color w-full" href="/masonry/"><span>Gallery</span><i class="fa-solid fa-image fa-sm fa-fw"></i></a></li>
+          </ul>
+        </div>
+        <div class="window-mask"></div>
+      </header>
+    </div>
+    <div class="main-content-body transition-fade-up">
+      <div class="main-content">
+        <div class="post-page-container flex relative justify-between box-border w-full h-full">
+          <div class="article-content-container">
+            <div class="article-title relative w-full">
+              <div class="w-full flex items-center pt-6 justify-start">
+                <h1 class="article-title-regular text-second-text-color tracking-tight text-4xl md:text-6xl font-semibold px-2 sm:px-6 md:px-8 py-3">${escapeHTML(post.title)}</h1>
+              </div>
+            </div>
+            <div class="article-header flex flex-row gap-2 items-center px-2 sm:px-6 md:px-8">
+              <div class="avatar w-[46px] h-[46px] flex-shrink-0 rounded-medium border border-border-color p-[1px]"><img src="/images/photo.jpg"></div>
+              <div class="info flex flex-col justify-between">
+                <div class="author flex items-center"><span class="name text-default-text-color text-lg font-semibold">Zixi</span></div>
+                <div class="meta-info"><div class="article-meta-info">
+                  <span class="article-date article-meta-item"><i class="fa-regular fa-pen-fancy"></i>&nbsp;<span class="desktop">${createdText}</span><span class="mobile">${createdText}</span><span class="hover-info">Created</span></span>
+                  <span class="article-date article-meta-item"><i class="fa-regular fa-wrench"></i>&nbsp;<span class="desktop">${updatedText}</span><span class="mobile">${updatedText}</span><span class="hover-info">Updated</span></span>
+                </div></div>
+              </div>
+            </div>
+            <div class="article-content markdown-body px-2 sm:px-6 md:px-8 pb-8">${articleHtml}</div>
+            <div class="post-copyright-info w-full my-8 px-2 sm:px-6 md:px-8">
+              <div class="article-copyright-info-container"><ul>
+                <li><strong>Title:</strong> ${escapeHTML(post.title)}</li>
+                <li><strong>Author:</strong> Zixi</li>
+                <li><strong>Created at:</strong> ${createdText}</li>
+                <li><strong>Updated at:</strong> ${updatedText}</li>
+                <li><strong>Link:</strong> ${escapeHTML(url)}</li>
+              </ul></div>
+            </div>
+            <div class="comment-container px-2 sm:px-6 md:px-8 pb-8"><div class="comments-container mt-10 w-full"><div id="comment-anchor" class="w-full h-2.5"></div><div class="comment-area-title w-full my-1.5 md:my-2.5 text-xl md:text-3xl font-bold">Comments</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="main-content-footer"><footer class="footer mt-5 py-5 h-auto text-base text-third-text-color relative border-t-2 border-t-border-color"><div class="info-container py-3 text-center">&copy; 2005 - 2026&nbsp;&nbsp;<a href="/">Zixi</a></div></footer></div>
+  </div>
+  <div class="right-side-tools-container"><div class="side-tools-container"><ul class="visible-tools-list"><li class="right-bottom-tools tool-scroll-to-top flex justify-center items-center"><i class="arrow-up fas fa-arrow-up"></i><span class="percent"></span></li></ul></div></div>
+</main>
+<script src="/js/blog-interactions.js" type="module"></script>
+</body>
+</html>
+`;
+}
+
+async function createGitBlob(content) {
+  const data = await githubRequest(`/repos/${authorEditorConfig.owner}/${authorEditorConfig.repo}/git/blobs`, {
+    method: "POST",
+    body: JSON.stringify({ content, encoding: "utf-8" }),
+  });
+  return data.sha;
+}
+
+async function commitFilesToGithub(files, message) {
+  const ref = await githubRequest(`/repos/${authorEditorConfig.owner}/${authorEditorConfig.repo}/git/ref/heads/${authorEditorConfig.branch}`);
+  const baseSha = ref.object?.sha;
+  const baseCommit = await githubRequest(`/repos/${authorEditorConfig.owner}/${authorEditorConfig.repo}/git/commits/${baseSha}`);
+  const treeEntries = [];
+
+  for (const file of files) {
+    const sha = await createGitBlob(file.content);
+    treeEntries.push({ path: file.path, mode: "100644", type: "blob", sha });
+  }
+
+  const tree = await githubRequest(`/repos/${authorEditorConfig.owner}/${authorEditorConfig.repo}/git/trees`, {
+    method: "POST",
+    body: JSON.stringify({ base_tree: baseCommit.tree.sha, tree: treeEntries }),
+  });
+  const commit = await githubRequest(`/repos/${authorEditorConfig.owner}/${authorEditorConfig.repo}/git/commits`, {
+    method: "POST",
+    body: JSON.stringify({ message, tree: tree.sha, parents: [baseSha] }),
+  });
+  await githubRequest(`/repos/${authorEditorConfig.owner}/${authorEditorConfig.repo}/git/refs/heads/${authorEditorConfig.branch}`, {
+    method: "PATCH",
+    body: JSON.stringify({ sha: commit.sha }),
+  });
+  return commit;
+}
+
+async function saveAuthorPost() {
+  try {
+    if (!authorSessionState.allowed) throw new Error("Only INTMAX-jpg can use this editor.");
+    if (!authorSessionState.token) throw new Error("GitHub write token is missing. Please sign out, then sign in with GitHub again and approve repository access.");
+
+    const values = getEditorValues();
+    setAuthorStatus("Preparing GitHub commit...");
+    const now = new Date();
+    const createdAt = activeAuthorPost?.createdAt || now.toISOString();
+    const createdDate = new Date(createdAt);
+    const path = activeAuthorPost?.path || buildPostPath(createdDate, values.slug);
+    const sourcePath = activeAuthorPost?.sourcePath || buildSourcePath(createdDate, values.slug);
+    const htmlPath = `${path}index.html`;
+    const id = activeAuthorPost?.id || `${formatPostDate(createdDate)}-${values.slug}`;
+    const post = {
+      id,
+      title: values.title,
+      slug: values.slug,
+      visibility: values.visibility,
+      createdAt,
+      updatedAt: now.toISOString(),
+      date: formatPostDate(createdDate),
+      path,
+      htmlPath: values.visibility === "visible" ? htmlPath : "",
+      sourcePath,
+      excerpt: createExcerpt(values.markdown),
+    };
+
+    const manifest = await loadGithubManifest();
+    const nextPosts = manifest.posts.filter((item) => item.id !== id);
+    nextPosts.unshift(post);
+    const nextManifest = { version: 1, posts: nextPosts };
+    const files = [
+      { path: sourcePath, content: values.markdown },
+      { path: authorEditorConfig.manifestPath, content: `${JSON.stringify(nextManifest, null, 2)}\n` },
+    ];
+
+    if (values.visibility === "visible") {
+      files.push({ path: htmlPath, content: buildPostHtml(post, markdownToHtml(values.markdown)) });
+    }
+
+    const commit = await commitFilesToGithub(files, `Save post: ${values.title}`);
+    setAuthorStatus(`Committed ${commit.sha.slice(0, 7)}. GitHub Pages may need a moment to refresh.`);
+    activeAuthorPost = { ...post, markdown: values.markdown };
+  } catch (error) {
+    console.warn("Author post save failed", error);
+    setAuthorStatus(error.message || "Save failed.", true);
+  }
+}
+
+async function openInvisiblePostDirectory() {
+  if (!authorSessionState.allowed) return;
+  injectAuthorEditorModal();
+  const modal = document.querySelector(".blog-author-modal");
+  if (!modal) return;
+  modal.hidden = false;
+  document.body.classList.add("blog-author-modal-open");
+  setAuthorStatus("Loading invisible posts...");
+
+  try {
+    const manifest = await loadGithubManifest();
+    const invisiblePosts = manifest.posts.filter((post) => post.visibility === "invisible");
+    const panel = modal.querySelector(".blog-author-fields");
+    const existing = modal.querySelector(".blog-author-directory");
+    if (existing) existing.remove();
+    const directory = document.createElement("div");
+    directory.className = "blog-author-directory";
+    directory.innerHTML = invisiblePosts.length
+      ? invisiblePosts.map((post) => `
+        <button type="button" data-author-post-id="${escapeHTML(post.id)}">
+          <strong>${escapeHTML(post.title)}</strong>
+          <span>${escapeHTML(post.date || "")}</span>
+        </button>
+      `).join("")
+      : '<div class="blog-author-directory-empty">No invisible posts yet.</div>';
+    panel.prepend(directory);
+    directory.querySelectorAll("[data-author-post-id]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const post = invisiblePosts.find((item) => item.id === button.dataset.authorPostId);
+        if (!post) return;
+        setAuthorStatus("Loading Markdown...");
+        const markdown = await loadGithubTextFile(post.sourcePath);
+        directory.remove();
+        openAuthorEditor({ ...post, markdown });
+      });
+    });
+    setAuthorStatus("");
+  } catch (error) {
+    console.warn("Invisible post directory failed", error);
+    setAuthorStatus(error.message || "Failed to load invisible posts.", true);
+  }
 }
 
 async function initAuth() {
@@ -2992,6 +3701,7 @@ function initBlogInteractions() {
   initHomeHeroSticky();
   initAuth();
   initSiteGuestbook();
+  injectDynamicVisiblePosts();
   initHomeArticleCardLinks();
   initVisitorAnalyticsPage();
   showAnalyticsEasterEggNote();
