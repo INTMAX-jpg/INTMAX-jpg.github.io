@@ -1757,6 +1757,98 @@ function buildHomeArticleCard(post) {
   `;
 }
 
+function isArchiveIndexPage() {
+  const path = window.location.pathname.replace(/\/index\.html$/, "/");
+  return path === "/archives/" || path === "/archives";
+}
+
+function getArchivePostDate(post) {
+  const raw = post?.createdAt || post?.date || "";
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getArchiveHref(post) {
+  return `/${String(post.path || "").replace(/^\/+/, "")}`;
+}
+
+function getArchiveYear(post) {
+  const date = getArchivePostDate(post);
+  return date ? String(date.getFullYear()) : String(post?.date || "").slice(0, 4);
+}
+
+function getArchiveMonthDay(post) {
+  const date = getArchivePostDate(post);
+  if (date) {
+    const pad = (value) => String(value).padStart(2, "0");
+    return `${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  }
+  const match = String(post?.date || "").match(/^\d{4}-(\d{2})-(\d{2})/);
+  return match ? `${match[1]}-${match[2]}` : "";
+}
+
+function normalizeArchiveHref(value) {
+  return String(value || "").replace(/\/index\.html$/, "/");
+}
+
+function buildArchiveArticleItem(post) {
+  return `
+    <li class="article-item space-y-2 px-6 pt-10 pb-2 text-xl relative border-l-2 border-border-color" date-is="${escapeHTML(getArchiveMonthDay(post))}" data-author-post-id="${escapeHTML(post.id || "")}">
+      <a href="${escapeHTML(getArchiveHref(post))}" class="block w-fit">
+        <span class="article-title my-0.5 text-2xl">${escapeHTML(post.title)}</span>
+      </a>
+    </li>
+  `;
+}
+
+function buildArchiveYearSection(year) {
+  return `
+    <section class="archive-item mb-spacing-unit last:mb-0" data-archive-year="${escapeHTML(year)}">
+      <div class="archive-item-header flex flex-row items-center mb-2">
+        <span class="archive-year font-semibold text-3xl mr-2">${escapeHTML(year)}</span>
+        <span class="archive-year-post-count text-xs md:text-sm font-bold rounded-small bg-third-background-color py-[2px] px-[10px] border border-border-color">0</span>
+      </div>
+      <ul class="article-list pl-0 md:pl-8 text-lg leading-[1.5]"></ul>
+    </section>
+  `;
+}
+
+function getArchiveSectionYear(section) {
+  return section.dataset.archiveYear || section.querySelector(".archive-year")?.textContent.trim() || "";
+}
+
+function ensureArchiveYearSection(container, year) {
+  const existing = Array.from(container.querySelectorAll(".archive-item"))
+    .find((section) => getArchiveSectionYear(section) === year);
+  if (existing) {
+    existing.dataset.archiveYear = year;
+    return existing;
+  }
+
+  const sections = Array.from(container.querySelectorAll(".archive-item"));
+  const before = sections.find((section) => Number(getArchiveSectionYear(section)) < Number(year));
+  if (before) {
+    before.insertAdjacentHTML("beforebegin", buildArchiveYearSection(year));
+  } else {
+    container.insertAdjacentHTML("beforeend", buildArchiveYearSection(year));
+  }
+  return Array.from(container.querySelectorAll(".archive-item"))
+    .find((section) => getArchiveSectionYear(section) === year);
+}
+
+function updateArchiveCounts() {
+  const allItems = document.querySelectorAll(".archive-list-container .article-item");
+  document.querySelectorAll(".archive-list-container .archive-item").forEach((section) => {
+    const count = section.querySelectorAll(".article-list .article-item").length;
+    const countNode = section.querySelector(".archive-year-post-count");
+    if (countNode) countNode.textContent = String(count);
+  });
+  document.querySelectorAll('.statistics a[href="/archives"] .number, .statistics a[href="/archives/"] .number').forEach((number) => {
+    number.textContent = String(allItems.length);
+    number.dataset.homeStatTarget = String(allItems.length);
+  });
+}
+
 async function loadPublicPostManifest() {
   try {
     const response = await fetch(`/${authorEditorConfig.manifestPath}?v=${Date.now()}`, { cache: "no-store" });
@@ -1788,6 +1880,39 @@ async function injectDynamicVisiblePosts() {
   });
   initHomeArticleCardLinks();
   updateHomePostsCount(true);
+}
+
+async function injectDynamicArchivePosts() {
+  if (!isArchiveIndexPage()) return;
+  const container = document.querySelector(".archive-list-container");
+  if (!container || container.dataset.dynamicArchiveLoaded === "true") return;
+  container.dataset.dynamicArchiveLoaded = "true";
+
+  const manifest = await loadPublicPostManifest();
+  const visiblePosts = manifest.posts
+    .filter((post) => post.visibility === "visible" && post.path && post.title)
+    .sort((a, b) => String(b.createdAt || b.date || "").localeCompare(String(a.createdAt || a.date || "")));
+  if (!visiblePosts.length) {
+    updateArchiveCounts();
+    return;
+  }
+
+  const existingLinks = new Set(Array.from(container.querySelectorAll(".article-list a[href]"))
+    .map((link) => normalizeArchiveHref(link.getAttribute("href"))));
+
+  visiblePosts.forEach((post) => {
+    const href = normalizeArchiveHref(getArchiveHref(post));
+    if (existingLinks.has(href)) return;
+    const year = getArchiveYear(post);
+    if (!year) return;
+    const section = ensureArchiveYearSection(container, year);
+    const list = section?.querySelector(".article-list");
+    if (!list) return;
+    list.insertAdjacentHTML("afterbegin", buildArchiveArticleItem(post));
+    existingLinks.add(href);
+  });
+
+  updateArchiveCounts();
 }
 
 function githubHeaders(token) {
@@ -3953,6 +4078,7 @@ function initBlogInteractions() {
   initAuth();
   initSiteGuestbook();
   injectDynamicVisiblePosts();
+  injectDynamicArchivePosts();
   initHomeArticleCardLinks();
   initVisitorAnalyticsPage();
   showAnalyticsEasterEggNote();
