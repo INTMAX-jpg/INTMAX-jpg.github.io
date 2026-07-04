@@ -1784,8 +1784,10 @@ async function injectDynamicVisiblePosts() {
     const href = `/${post.path}`;
     if (existingLinks.has(href)) return;
     list.insertAdjacentHTML("afterbegin", buildHomeArticleCard(post));
+    existingLinks.add(href);
   });
   initHomeArticleCardLinks();
+  updateHomePostsCount(true);
 }
 
 function githubHeaders(token) {
@@ -2898,16 +2900,42 @@ function animateHomeStats() {
   });
 }
 
+function getRenderedHomePostCount() {
+  const keys = new Set();
+  document.querySelectorAll(".home-article-list .home-article-item").forEach((item, index) => {
+    const link = item.querySelector(".home-article-title a[href], .home-article-meta-info-container a[href]");
+    const key = link?.getAttribute("href") || item.dataset.authorPostId || `article-${index}`;
+    keys.add(key.replace(/\/index\.html$/, "/"));
+  });
+  return keys.size;
+}
+
+function updateHomePostsCount(animate = false) {
+  const count = getRenderedHomePostCount();
+  document.querySelectorAll('.statistics a[href="/archives"], .statistics a[href="/archives/"]').forEach((item) => {
+    const number = item.querySelector(".number");
+    if (!number) return;
+    number.dataset.homeStatCount = "true";
+    number.dataset.homeStatTarget = String(count);
+    if (animate) {
+      animateHomeStatNumber(number, count);
+    } else {
+      number.textContent = String(count);
+    }
+  });
+}
+
 function prepareHomePostsCount() {
-  document.querySelectorAll('.statistics a[href="/archives"]').forEach((item) => {
+  document.querySelectorAll('.statistics a[href="/archives"], .statistics a[href="/archives/"]').forEach((item) => {
     const number = item.querySelector(".number");
     const label = item.querySelector(".label");
     if (number) {
       number.dataset.homeStatCount = "true";
-      number.dataset.homeStatTarget = number.dataset.homeStatTarget || number.textContent.trim() || "0";
+      number.dataset.homeStatTarget = String(getRenderedHomePostCount());
     }
     if (label) label.textContent = "帖子";
   });
+  updateHomePostsCount(false);
 }
 
 function fitHomeLikeCount(node, count) {
