@@ -60,6 +60,7 @@ const analyticsEasterEggStorageKey = "ZIXI_ANALYTICS_EASTER_EGG_SEEN";
 const onboardingLoginPromptStorageKey = "ZIXI_ONBOARDING_LOGIN_PROMPT_DISMISSED";
 const onboardingUserStoragePrefix = "ZIXI_ONBOARDING_DONE";
 const onboardingPendingStepStorageKey = "ZIXI_ONBOARDING_PENDING_STEP";
+const onboardingAlwaysShowForTesting = true;
 let galleryNoteIntroTimer = null;
 let galleryNoteIntroCleanupTimer = null;
 let homeNoteIntroTimer = null;
@@ -68,6 +69,8 @@ let analyticsEasterEggTimer = null;
 let analyticsEasterEggCleanupTimer = null;
 let onboardingRetryTimer = null;
 let onboardingPositionHandler = null;
+let onboardingLoginPromptShownThisPage = false;
+let onboardingUserTourShownThisPage = false;
 let onboardingState = {
   active: false,
   mode: "",
@@ -1115,10 +1118,13 @@ function advanceOnboarding() {
 }
 
 function maybeShowLoginOnboarding() {
-  if (currentSession?.user || hasDismissedLoginOnboarding()) return;
+  if (currentSession?.user) return;
+  if (onboardingAlwaysShowForTesting && onboardingLoginPromptShownThisPage) return;
+  if (!onboardingAlwaysShowForTesting && hasDismissedLoginOnboarding()) return;
   if (!isHomePage()) return;
+  onboardingLoginPromptShownThisPage = true;
   window.setTimeout(() => {
-    if (!currentSession?.user && !hasDismissedLoginOnboarding()) {
+    if (!currentSession?.user && (onboardingAlwaysShowForTesting || !hasDismissedLoginOnboarding())) {
       startOnboarding("login", getLoginOnboardingSteps(), 0);
     }
   }, 900);
@@ -1126,7 +1132,9 @@ function maybeShowLoginOnboarding() {
 
 function maybeStartUserOnboarding(session = currentSession) {
   const user = session?.user;
-  if (!user || hasCompletedUserOnboarding(user)) return;
+  if (!user) return;
+  if (onboardingAlwaysShowForTesting && onboardingUserTourShownThisPage) return;
+  if (!onboardingAlwaysShowForTesting && hasCompletedUserOnboarding(user)) return;
 
   const pendingStep = getPendingOnboardingStep();
   const shouldStartOnGallery = pendingStep > 0 && isGalleryPage();
@@ -1136,8 +1144,9 @@ function maybeStartUserOnboarding(session = currentSession) {
     return;
   }
 
+  onboardingUserTourShownThisPage = true;
   window.setTimeout(() => {
-    if (currentSession?.user?.id === user.id && !hasCompletedUserOnboarding(user)) {
+    if (currentSession?.user?.id === user.id && (onboardingAlwaysShowForTesting || !hasCompletedUserOnboarding(user))) {
       startOnboarding("user", getUserOnboardingSteps(), shouldStartOnGallery ? pendingStep : 0);
     }
   }, 900);
