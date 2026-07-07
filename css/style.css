@@ -2258,9 +2258,14 @@ html.is-animating .transition-navbar {
 .page-template-container #masonry-container .gallery-photo-like:hover,
 .page-template-container #masonry-container .gallery-photo-like:focus-visible,
 .page-template-container #masonry-container .gallery-photo-like.is-expanded,
-.page-template-container #masonry-container .gallery-photo-like.is-count-visible {
+.page-template-container #masonry-container .gallery-photo-like.is-count-visible,
+.page-template-container #masonry-container .gallery-photo-like.zixi-onboarding-target {
   opacity: 1;
   transform: translate(0, 0) scale(1);
+}
+.page-template-container #masonry-container .gallery-photo-like.zixi-onboarding-target {
+  opacity: 1 !important;
+  transform: translate(0, 0) scale(1) !important;
 }
 .page-template-container #masonry-container .gallery-photo-like:hover,
 .page-template-container #masonry-container .gallery-photo-like:focus-visible,
@@ -7366,10 +7371,7 @@ body.zixi-onboarding-active {
   position: absolute;
   inset: 0;
   pointer-events: auto;
-  background:
-    radial-gradient(circle at 50% 42%, rgba(163, 31, 52, 0.32), transparent 36%),
-    rgba(18, 13, 15, 0.62);
-  backdrop-filter: blur(2px);
+  background: transparent;
 }
 .zixi-onboarding-highlight {
   position: fixed;

@@ -918,7 +918,7 @@ function getUserOnboardingSteps() {
     {
       title: "给博客点赞",
       body: "喜欢这个小站时，可以点这里给 Zixi 一个鼓励。",
-      selectors: [".home-likes-stat"],
+      selectors: [".home-likes-stat [data-home-likes-count]", ".home-likes-stat"],
     },
     {
       title: "留下评论或留言",
