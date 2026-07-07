@@ -7351,6 +7351,176 @@ body.blog-author-modal-open {
 .blog-auth-email-status.is-error {
   color: #d94b5d !important;
 }
+
+body.zixi-onboarding-active {
+  overflow-x: hidden;
+}
+.zixi-onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+  font-family: Geist, "Inter", sans-serif;
+}
+.zixi-onboarding-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(163, 31, 52, 0.32), transparent 36%),
+    rgba(18, 13, 15, 0.62);
+  backdrop-filter: blur(2px);
+}
+.zixi-onboarding-highlight {
+  position: fixed;
+  z-index: 9999;
+  border: 2px solid rgba(214, 42, 66, 0.96);
+  border-radius: 18px;
+  box-shadow:
+    0 0 0 9999px rgba(20, 14, 16, 0.48),
+    0 0 0 5px rgba(255, 255, 255, 0.72),
+    0 22px 70px rgba(163, 31, 52, 0.42);
+  pointer-events: none;
+  transition: left 0.2s ease, top 0.2s ease, width 0.2s ease, height 0.2s ease;
+}
+.zixi-onboarding-target {
+  position: relative;
+  z-index: 9997;
+}
+.zixi-onboarding-card {
+  position: fixed;
+  z-index: 10000;
+  width: min(420px, calc(100vw - 32px));
+  padding: 28px 28px 0;
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 28px 82px rgba(0, 0, 0, 0.32);
+  color: rgba(25, 27, 31, 0.94);
+  pointer-events: auto;
+  text-align: center;
+}
+html.dark .zixi-onboarding-card,
+html[data-theme="dark"] .zixi-onboarding-card,
+:root[data-theme="dark"] .zixi-onboarding-card {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(27, 25, 28, 0.96);
+  color: rgba(245, 241, 236, 0.94);
+}
+.zixi-onboarding-arrow {
+  position: absolute;
+  top: -12px;
+  width: 24px;
+  height: 24px;
+  transform: translateX(-50%) rotate(45deg);
+  border-left: 1px solid rgba(255, 255, 255, 0.68);
+  border-top: 1px solid rgba(255, 255, 255, 0.68);
+  background: inherit;
+}
+.zixi-onboarding-card[data-placement="bottom"] .zixi-onboarding-arrow {
+  top: auto;
+  bottom: -12px;
+  border: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.68);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.68);
+}
+.zixi-onboarding-kicker {
+  margin-bottom: 8px;
+  color: #a31f34;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.zixi-onboarding-card h2 {
+  margin: 0 0 16px !important;
+  color: inherit !important;
+  font-size: 1.45rem !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+}
+.zixi-onboarding-card p {
+  margin: 0 0 26px !important;
+  color: rgba(54, 54, 58, 0.84) !important;
+  font-size: 1rem !important;
+  line-height: 1.65 !important;
+}
+html.dark .zixi-onboarding-card p,
+html[data-theme="dark"] .zixi-onboarding-card p,
+:root[data-theme="dark"] .zixi-onboarding-card p {
+  color: rgba(232, 225, 218, 0.74) !important;
+}
+.zixi-onboarding-actions {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 14px;
+  margin: 0 -28px;
+  padding: 14px 20px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+html.dark .zixi-onboarding-actions,
+html[data-theme="dark"] .zixi-onboarding-actions,
+:root[data-theme="dark"] .zixi-onboarding-actions {
+  border-top-color: rgba(255, 255, 255, 0.12);
+}
+.zixi-onboarding-skip,
+.zixi-onboarding-next {
+  min-height: 44px;
+  border: 0;
+  border-radius: 999px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.zixi-onboarding-skip {
+  background: transparent;
+  color: currentColor;
+  text-align: left;
+}
+.zixi-onboarding-next {
+  justify-self: end;
+  min-width: 94px;
+  padding: 0 22px;
+  background: #a31f34;
+  color: #fff;
+  box-shadow: 0 10px 28px rgba(163, 31, 52, 0.32);
+}
+.zixi-onboarding-next:hover,
+.zixi-onboarding-next:focus-visible {
+  background: #bd2941;
+}
+.zixi-onboarding-progress {
+  color: rgba(86, 84, 88, 0.82);
+  font-size: 0.98rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+html.dark .zixi-onboarding-progress,
+html[data-theme="dark"] .zixi-onboarding-progress,
+:root[data-theme="dark"] .zixi-onboarding-progress {
+  color: rgba(232, 225, 218, 0.72);
+}
+@media (max-width: 520px) {
+  .zixi-onboarding-card {
+    padding: 24px 22px 0;
+    border-radius: 14px;
+  }
+  .zixi-onboarding-card h2 {
+    font-size: 1.22rem !important;
+  }
+  .zixi-onboarding-card p {
+    font-size: 0.94rem !important;
+  }
+  .zixi-onboarding-actions {
+    margin: 0 -22px;
+    padding: 12px 16px;
+  }
+  .zixi-onboarding-next {
+    min-width: 82px;
+    padding: 0 18px;
+  }
+}
 @media (max-width: 520px) {
   .blog-auth-panel {
     padding: 18px;

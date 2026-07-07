@@ -57,12 +57,24 @@ const dwellTimeState = {
 const galleryNoteIntroStorageKey = "ZIXI_GALLERY_NOTE_INTRO_SEEN";
 const homeNoteIntroStorageKey = "ZIXI_HOME_NOTE_INTRO_SEEN";
 const analyticsEasterEggStorageKey = "ZIXI_ANALYTICS_EASTER_EGG_SEEN";
+const onboardingLoginPromptStorageKey = "ZIXI_ONBOARDING_LOGIN_PROMPT_DISMISSED";
+const onboardingUserStoragePrefix = "ZIXI_ONBOARDING_DONE";
+const onboardingPendingStepStorageKey = "ZIXI_ONBOARDING_PENDING_STEP";
 let galleryNoteIntroTimer = null;
 let galleryNoteIntroCleanupTimer = null;
 let homeNoteIntroTimer = null;
 let homeNoteIntroCleanupTimer = null;
 let analyticsEasterEggTimer = null;
 let analyticsEasterEggCleanupTimer = null;
+let onboardingRetryTimer = null;
+let onboardingPositionHandler = null;
+let onboardingState = {
+  active: false,
+  mode: "",
+  stepIndex: 0,
+  steps: [],
+  target: null,
+};
 let homeNoteScrollY = 0;
 let homeNoteInteractionLocked = false;
 let authForgotNoteTimer = null;
@@ -799,6 +811,337 @@ function scheduleGalleryPreload() {
     window.addEventListener("load", begin, { once: true });
   }
 }
+
+function getOnboardingUserKey(user = currentSession?.user) {
+  return `${onboardingUserStoragePrefix}:${user?.id || "anonymous"}`;
+}
+
+function hasCompletedUserOnboarding(user = currentSession?.user) {
+  if (!user?.id) return true;
+  try {
+    return localStorage.getItem(getOnboardingUserKey(user)) === "true";
+  } catch (error) {
+    return false;
+  }
+}
+
+function markUserOnboardingComplete(user = currentSession?.user) {
+  if (!user?.id) return;
+  try {
+    localStorage.setItem(getOnboardingUserKey(user), "true");
+    sessionStorage.removeItem(onboardingPendingStepStorageKey);
+  } catch (error) {}
+}
+
+function hasDismissedLoginOnboarding() {
+  try {
+    return localStorage.getItem(onboardingLoginPromptStorageKey) === "true";
+  } catch (error) {
+    return true;
+  }
+}
+
+function dismissLoginOnboarding() {
+  try {
+    localStorage.setItem(onboardingLoginPromptStorageKey, "true");
+  } catch (error) {}
+}
+
+function getPendingOnboardingStep() {
+  try {
+    const raw = sessionStorage.getItem(onboardingPendingStepStorageKey);
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : 0;
+  } catch (error) {
+    return 0;
+  }
+}
+
+function setPendingOnboardingStep(index) {
+  try {
+    sessionStorage.setItem(onboardingPendingStepStorageKey, String(index));
+  } catch (error) {}
+}
+
+function clearPendingOnboardingStep() {
+  try {
+    sessionStorage.removeItem(onboardingPendingStepStorageKey);
+  } catch (error) {}
+}
+
+function isElementVisible(element) {
+  if (!element) return false;
+  const rect = element.getBoundingClientRect();
+  const style = window.getComputedStyle(element);
+  return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+}
+
+function findVisibleElement(selectors) {
+  for (const selector of selectors) {
+    const elements = Array.from(document.querySelectorAll(selector));
+    const visible = elements.find(isElementVisible);
+    if (visible) return visible;
+  }
+  return null;
+}
+
+function isIntroOverlayActive() {
+  return Boolean(document.querySelector(".home-note-intro, .gallery-note-intro, .birthday-cake-intro, .blog-auth-modal:not([hidden]), .guestbook-modal:not([hidden])"));
+}
+
+function getDesktopGalleryNavSelector() {
+  return [
+    '.navbar-list .navbar-item a[href="/masonry/"]',
+    '.navbar-list .navbar-item a[href="/masonry"]',
+    '.drawer-navbar-list a[href="/masonry/"]',
+  ];
+}
+
+function getLoginOnboardingSteps() {
+  return [{
+    title: "先登录或注册",
+    body: "登录后可以评论、留言和记录你的互动状态。点击这里开始。",
+    selectors: [".blog-auth-nav .blog-auth-button", ".blog-auth-drawer .blog-auth-button"],
+    nextLabel: "登录 / 注册",
+    progressLabel: "1 / 1",
+    action: "open-login",
+  }];
+}
+
+function getUserOnboardingSteps() {
+  return [
+    {
+      title: "浏览博文卡片",
+      body: "这里会展示最新文章。点击卡片或 Read more 可以进入正文。",
+      selectors: [".home-article-list .home-article-item"],
+    },
+    {
+      title: "给博客点赞",
+      body: "喜欢这个小站时，可以点这里给 Zixi 一个鼓励。",
+      selectors: [".home-likes-stat"],
+    },
+    {
+      title: "留下评论或留言",
+      body: "这里可以打开留言入口，登录后就能写下想说的话。",
+      selectors: [".home-comment-button", ".site-comments-stat"],
+    },
+    {
+      title: "进入相册",
+      body: "相册里放着照片墙。下一步会带你跳转到相册页。",
+      selectors: getDesktopGalleryNavSelector(),
+      nextLabel: "去相册",
+      action: "go-gallery",
+    },
+    {
+      title: "给照片点赞",
+      body: "每张照片右下角都有爱心按钮，可以单独为喜欢的照片点赞。",
+      selectors: [".gallery-photo-like"],
+      path: "/masonry/",
+    },
+  ];
+}
+
+function clearOnboardingOverlay() {
+  window.clearTimeout(onboardingRetryTimer);
+  onboardingRetryTimer = null;
+  if (onboardingPositionHandler) {
+    window.removeEventListener("resize", onboardingPositionHandler);
+    window.removeEventListener("scroll", onboardingPositionHandler, true);
+    onboardingPositionHandler = null;
+  }
+  document.querySelectorAll(".zixi-onboarding-overlay").forEach((element) => element.remove());
+  document.querySelectorAll(".zixi-onboarding-target").forEach((element) => element.classList.remove("zixi-onboarding-target"));
+  document.body.classList.remove("zixi-onboarding-active");
+  onboardingState.target = null;
+}
+
+function finishOnboarding(markComplete = true) {
+  if (onboardingState.mode === "login") {
+    dismissLoginOnboarding();
+  } else if (markComplete) {
+    markUserOnboardingComplete();
+  }
+  clearPendingOnboardingStep();
+  onboardingState = { active: false, mode: "", stepIndex: 0, steps: [], target: null };
+  clearOnboardingOverlay();
+}
+
+function positionOnboardingOverlay(target, card, highlight, arrow) {
+  const rect = target.getBoundingClientRect();
+  const gap = 18;
+  const margin = 16;
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+
+  highlight.style.left = `${Math.max(8, rect.left - 10)}px`;
+  highlight.style.top = `${Math.max(8, rect.top - 10)}px`;
+  highlight.style.width = `${Math.min(viewportWidth - 16, rect.width + 20)}px`;
+  highlight.style.height = `${Math.min(viewportHeight - 16, rect.height + 20)}px`;
+
+  const cardRect = card.getBoundingClientRect();
+  let top = rect.bottom + gap;
+  let placement = "top";
+  if (top + cardRect.height + margin > viewportHeight && rect.top - cardRect.height - gap > margin) {
+    top = rect.top - cardRect.height - gap;
+    placement = "bottom";
+  }
+  let left = rect.left + rect.width / 2 - cardRect.width / 2;
+  left = Math.max(margin, Math.min(left, viewportWidth - cardRect.width - margin));
+
+  card.style.left = `${left}px`;
+  card.style.top = `${Math.max(margin, top)}px`;
+  card.dataset.placement = placement;
+
+  const arrowLeft = rect.left + rect.width / 2 - left;
+  arrow.style.left = `${Math.max(22, Math.min(cardRect.width - 22, arrowLeft))}px`;
+}
+
+function renderOnboardingStep(target) {
+  clearOnboardingOverlay();
+  const step = onboardingState.steps[onboardingState.stepIndex];
+  if (!step || !target) return;
+
+  target.classList.add("zixi-onboarding-target");
+  target.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+
+  const overlay = document.createElement("div");
+  overlay.className = "zixi-onboarding-overlay";
+  overlay.innerHTML = `
+    <div class="zixi-onboarding-scrim"></div>
+    <div class="zixi-onboarding-highlight" aria-hidden="true"></div>
+    <section class="zixi-onboarding-card" role="dialog" aria-live="polite" aria-label="Site introduction">
+      <span class="zixi-onboarding-arrow" aria-hidden="true"></span>
+      <div class="zixi-onboarding-kicker">Quick Tour</div>
+      <h2>${escapeHTML(step.title)}</h2>
+      <p>${escapeHTML(step.body)}</p>
+      <div class="zixi-onboarding-actions">
+        <button class="zixi-onboarding-skip" type="button">Skip</button>
+        <span class="zixi-onboarding-progress">${escapeHTML(step.progressLabel || `${onboardingState.stepIndex + 1} / ${onboardingState.steps.length}`)}</span>
+        <button class="zixi-onboarding-next" type="button">${escapeHTML(step.nextLabel || (onboardingState.stepIndex === onboardingState.steps.length - 1 ? "Done" : "Next"))}</button>
+      </div>
+    </section>
+  `;
+  document.body.appendChild(overlay);
+  document.body.classList.add("zixi-onboarding-active");
+
+  const card = overlay.querySelector(".zixi-onboarding-card");
+  const highlight = overlay.querySelector(".zixi-onboarding-highlight");
+  const arrow = overlay.querySelector(".zixi-onboarding-arrow");
+  requestAnimationFrame(() => positionOnboardingOverlay(target, card, highlight, arrow));
+  onboardingPositionHandler = () => positionOnboardingOverlay(target, card, highlight, arrow);
+  window.addEventListener("resize", onboardingPositionHandler);
+  window.addEventListener("scroll", onboardingPositionHandler, true);
+
+  overlay.querySelector(".zixi-onboarding-skip")?.addEventListener("click", () => finishOnboarding(true));
+  overlay.querySelector(".zixi-onboarding-next")?.addEventListener("click", advanceOnboarding);
+}
+
+function showOnboardingStep(attempt = 0) {
+  if (!onboardingState.active) return;
+  if (isIntroOverlayActive()) {
+    onboardingRetryTimer = window.setTimeout(() => showOnboardingStep(attempt + 1), 600);
+    return;
+  }
+
+  const step = onboardingState.steps[onboardingState.stepIndex];
+  if (!step) {
+    finishOnboarding(true);
+    return;
+  }
+
+  const normalizedPath = window.location.pathname.replace(/\/index\.html$/, "/");
+  if (step.path && normalizedPath !== step.path) {
+    setPendingOnboardingStep(onboardingState.stepIndex);
+    window.location.href = step.path;
+    return;
+  }
+
+  const target = findVisibleElement(step.selectors);
+  if (!target) {
+    if (attempt < 25) {
+      onboardingRetryTimer = window.setTimeout(() => showOnboardingStep(attempt + 1), 400);
+      return;
+    }
+    advanceOnboarding();
+    return;
+  }
+
+  onboardingState.target = target;
+  renderOnboardingStep(target);
+}
+
+function startOnboarding(mode, steps, startIndex = 0) {
+  if (!steps.length) return;
+  clearOnboardingOverlay();
+  onboardingState = {
+    active: true,
+    mode,
+    stepIndex: Math.max(0, Math.min(startIndex, steps.length - 1)),
+    steps,
+    target: null,
+  };
+  showOnboardingStep();
+}
+
+function advanceOnboarding() {
+  const step = onboardingState.steps[onboardingState.stepIndex];
+  if (!step) {
+    finishOnboarding(true);
+    return;
+  }
+
+  if (step.action === "open-login") {
+    dismissLoginOnboarding();
+    finishOnboarding(false);
+    openAuthModal("signup");
+    return;
+  }
+
+  if (step.action === "go-gallery") {
+    onboardingState.stepIndex += 1;
+    setPendingOnboardingStep(onboardingState.stepIndex);
+    clearOnboardingOverlay();
+    window.location.href = "/masonry/";
+    return;
+  }
+
+  if (onboardingState.stepIndex >= onboardingState.steps.length - 1) {
+    finishOnboarding(true);
+    return;
+  }
+
+  onboardingState.stepIndex += 1;
+  showOnboardingStep();
+}
+
+function maybeShowLoginOnboarding() {
+  if (currentSession?.user || hasDismissedLoginOnboarding()) return;
+  if (!isHomePage()) return;
+  window.setTimeout(() => {
+    if (!currentSession?.user && !hasDismissedLoginOnboarding()) {
+      startOnboarding("login", getLoginOnboardingSteps(), 0);
+    }
+  }, 900);
+}
+
+function maybeStartUserOnboarding(session = currentSession) {
+  const user = session?.user;
+  if (!user || hasCompletedUserOnboarding(user)) return;
+
+  const pendingStep = getPendingOnboardingStep();
+  const shouldStartOnGallery = pendingStep > 0 && isGalleryPage();
+  if (!isHomePage() && !shouldStartOnGallery) {
+    setPendingOnboardingStep(0);
+    window.location.href = "/";
+    return;
+  }
+
+  window.setTimeout(() => {
+    if (currentSession?.user?.id === user.id && !hasCompletedUserOnboarding(user)) {
+      startOnboarding("user", getUserOnboardingSteps(), shouldStartOnGallery ? pendingStep : 0);
+    }
+  }, 900);
+}
 function getSupabaseClient() {
   if (!supabaseClientPromise) {
     supabaseClientPromise = import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm")
@@ -1219,6 +1562,7 @@ function updateAuthUI(session) {
       avatar.style.backgroundImage = "";
       avatar.textContent = "";
     });
+    maybeShowLoginOnboarding();
     return;
   }
 
@@ -1240,6 +1584,7 @@ function updateAuthUI(session) {
     avatarNode.style.backgroundImage = avatar ? `url("${avatar}")` : "";
   });
   refreshAuthorAccess(session);
+  maybeStartUserOnboarding(session);
 }
 
 function getGithubLoginFromUser(user) {
