@@ -7452,8 +7452,9 @@ html[data-theme="dark"] .zixi-onboarding-card p,
 }
 .zixi-onboarding-actions {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(112px, 1fr) auto minmax(112px, 1fr);
   align-items: center;
+  justify-items: center;
   gap: 14px;
   margin: 0 -28px;
   padding: 14px 20px;
@@ -7466,6 +7467,9 @@ html[data-theme="dark"] .zixi-onboarding-actions,
 }
 .zixi-onboarding-skip,
 .zixi-onboarding-next {
+  box-sizing: border-box;
+  width: 112px;
+  max-width: 100%;
   min-height: 44px;
   border: 0;
   border-radius: 999px;
@@ -7476,11 +7480,9 @@ html[data-theme="dark"] .zixi-onboarding-actions,
 .zixi-onboarding-skip {
   background: transparent;
   color: currentColor;
-  text-align: left;
+  text-align: center;
 }
 .zixi-onboarding-next {
-  justify-self: end;
-  min-width: 94px;
   padding: 0 22px;
   background: #a31f34;
   color: #fff;
@@ -7513,11 +7515,15 @@ html[data-theme="dark"] .zixi-onboarding-progress,
     font-size: 0.94rem !important;
   }
   .zixi-onboarding-actions {
+    grid-template-columns: minmax(92px, 1fr) auto minmax(92px, 1fr);
     margin: 0 -22px;
     padding: 12px 16px;
   }
+  .zixi-onboarding-skip,
   .zixi-onboarding-next {
-    min-width: 82px;
+    width: 92px;
+  }
+  .zixi-onboarding-next {
     padding: 0 18px;
   }
 }
