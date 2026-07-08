@@ -42,6 +42,7 @@ let authListenerInitialized = false;
 let activePostContext = null;
 let authorSessionState = { allowed: false, token: "", login: "", checkedToken: "" };
 let activeAuthorPost = null;
+let authorEditorClipboardHandlersInstalled = false;
 let galleryPreloadScheduleStarted = false;
 let analyticsListenerInstalled = false;
 let lastTrackedPageKey = "";
@@ -1749,7 +1750,10 @@ async function refreshAuthorAccess(session) {
 }
 
 function injectAuthorEditorModal() {
-  if (document.querySelector(".blog-author-modal")) return;
+  if (document.querySelector(".blog-author-modal")) {
+    installAuthorEditorClipboardHandlers();
+    return;
+  }
 
   const modal = document.createElement("div");
   modal.className = "blog-author-modal";
@@ -1807,9 +1811,7 @@ function injectAuthorEditorModal() {
   modal.querySelector(".blog-author-slug-input")?.addEventListener("input", (event) => {
     event.currentTarget.dataset.edited = "true";
   });
-  modal.addEventListener("paste", handleAuthorMarkdownPaste, true);
-  modal.addEventListener("beforeinput", handleAuthorMarkdownBeforeInput, true);
-  modal.addEventListener("drop", handleAuthorMarkdownDrop, true);
+  installAuthorEditorClipboardHandlers();
   modal.querySelectorAll("[data-author-visibility]").forEach((button) => {
     button.addEventListener("click", () => setAuthorVisibility(button.dataset.authorVisibility || "visible"));
   });
@@ -2041,6 +2043,45 @@ function collectPastedImageSources(event) {
       return candidateKey === key;
     }) === index;
   });
+}
+
+function dataTransferMayContainImages(dataTransfer) {
+  const types = [
+    ...Array.from(dataTransfer?.types || []),
+    ...Array.from(dataTransfer?.items || []).map((item) => item.type),
+  ].map((type) => String(type).toLowerCase());
+  const html = String(dataTransfer?.getData?.("text/html") || "");
+  return types.some((type) => type === "files" || type.startsWith("image/")) || /<img\b/i.test(html);
+}
+
+async function collectAsyncClipboardImageSources() {
+  if (!window.isSecureContext || !navigator.clipboard?.read) return [];
+
+  try {
+    const clipboardItems = await navigator.clipboard.read();
+    const sources = [];
+    for (const item of clipboardItems) {
+      const imageType = Array.from(item.types || []).find((type) => String(type).toLowerCase().startsWith("image/"));
+      if (!imageType) continue;
+      const blob = await item.getType(imageType);
+      const extension = getImageExtensionFromMime(imageType) || getImageExtension(blob);
+      const name = `clipboard-image-${sources.length + 1}.${extension}`;
+      const file = typeof File === "function"
+        ? new File([blob], name, { type: imageType })
+        : blob;
+      sources.push({
+        kind: "file",
+        file,
+        name,
+        type: imageType,
+        extension,
+      });
+    }
+    return sources;
+  } catch (error) {
+    console.warn("Async clipboard image read failed", error);
+    return [];
+  }
 }
 
 function getActiveAuthorTextarea(event) {
@@ -2597,13 +2638,31 @@ async function uploadAuthorMarkdownImages(event, sources) {
   }
 }
 
+function installAuthorEditorClipboardHandlers() {
+  if (authorEditorClipboardHandlersInstalled) return;
+  authorEditorClipboardHandlersInstalled = true;
+  document.addEventListener("paste", handleAuthorMarkdownPaste, true);
+  document.addEventListener("beforeinput", handleAuthorMarkdownBeforeInput, true);
+  document.addEventListener("drop", handleAuthorMarkdownDrop, true);
+}
+
 async function handleAuthorMarkdownPaste(event) {
-  const sources = collectPastedImageSources(event);
+  const textarea = getActiveAuthorTextarea(event);
+  if (!textarea) return;
+
+  let sources = collectPastedImageSources(event);
+  if (!sources.length && dataTransferMayContainImages(event.clipboardData)) {
+    event.preventDefault();
+    setAuthorStatus("Reading image from clipboard...");
+    sources = await collectAsyncClipboardImageSources();
+  }
   if (!sources.length) return;
   await uploadAuthorMarkdownImages(event, sources);
 }
 
 async function handleAuthorMarkdownBeforeInput(event) {
+  const textarea = getActiveAuthorTextarea(event);
+  if (!textarea) return;
   if (event.inputType !== "insertFromPaste") return;
   const files = collectImageFilesFromDataTransfer(event.dataTransfer);
   if (!files.length) return;
@@ -2612,6 +2671,8 @@ async function handleAuthorMarkdownBeforeInput(event) {
 }
 
 async function handleAuthorMarkdownDrop(event) {
+  const textarea = getActiveAuthorTextarea(event);
+  if (!textarea) return;
   const files = collectImageFilesFromDataTransfer(event.dataTransfer);
   if (!files.length) return;
   const sources = files.map((file) => ({ kind: "file", file, name: file.name || "dropped-image", type: file.type || "" }));
