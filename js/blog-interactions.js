@@ -979,13 +979,14 @@ function positionOnboardingOverlay(target, card, highlight, arrow) {
   const rect = target.getBoundingClientRect();
   const gap = 18;
   const margin = 16;
+  const highlightPadding = 4;
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
 
-  highlight.style.left = `${Math.max(8, rect.left - 10)}px`;
-  highlight.style.top = `${Math.max(8, rect.top - 10)}px`;
-  highlight.style.width = `${Math.min(viewportWidth - 16, rect.width + 20)}px`;
-  highlight.style.height = `${Math.min(viewportHeight - 16, rect.height + 20)}px`;
+  highlight.style.left = `${Math.max(8, rect.left - highlightPadding)}px`;
+  highlight.style.top = `${Math.max(8, rect.top - highlightPadding)}px`;
+  highlight.style.width = `${Math.min(viewportWidth - 16, rect.width + highlightPadding * 2)}px`;
+  highlight.style.height = `${Math.min(viewportHeight - 16, rect.height + highlightPadding * 2)}px`;
 
   const cardRect = card.getBoundingClientRect();
   let top = rect.bottom + gap;
@@ -1009,6 +1010,8 @@ function renderOnboardingStep(target) {
   clearOnboardingOverlay();
   const step = onboardingState.steps[onboardingState.stepIndex];
   if (!step || !target) return;
+  const nextLabel = step.nextLabel || (onboardingState.stepIndex === onboardingState.steps.length - 1 ? "Done" : "Next");
+  const nextLabelClass = nextLabel.length > 7 ? " is-tight" : nextLabel.length > 4 ? " is-compact" : "";
 
   target.classList.add("zixi-onboarding-target");
   target.scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
@@ -1026,7 +1029,7 @@ function renderOnboardingStep(target) {
       <div class="zixi-onboarding-actions">
         <button class="zixi-onboarding-skip" type="button">Skip</button>
         <span class="zixi-onboarding-progress">${escapeHTML(step.progressLabel || `${onboardingState.stepIndex + 1} / ${onboardingState.steps.length}`)}</span>
-        <button class="zixi-onboarding-next" type="button">${escapeHTML(step.nextLabel || (onboardingState.stepIndex === onboardingState.steps.length - 1 ? "Done" : "Next"))}</button>
+        <button class="zixi-onboarding-next${nextLabelClass}" type="button">${escapeHTML(nextLabel)}</button>
       </div>
     </section>
   `;
