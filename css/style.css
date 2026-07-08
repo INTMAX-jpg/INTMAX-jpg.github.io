@@ -7359,8 +7359,6 @@ body.blog-author-modal-open {
 
 html.zixi-onboarding-active,
 body.zixi-onboarding-active {
-  overflow: hidden;
-  overflow-x: hidden;
   overscroll-behavior: none;
 }
 .zixi-onboarding-overlay {

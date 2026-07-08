@@ -1060,6 +1060,32 @@ function scheduleOnboardingPositionUpdates(target, card, highlight, arrow) {
   });
 }
 
+function scrollOnboardingTargetIntoView(target) {
+  unlockOnboardingScroll();
+  document.documentElement.classList.remove("zixi-onboarding-active");
+  document.body.classList.remove("zixi-onboarding-active");
+
+  const rect = target.getBoundingClientRect();
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+  const documentHeight = Math.max(
+    document.body.scrollHeight,
+    document.documentElement.scrollHeight,
+  );
+  const topMargin = Math.min(120, Math.max(72, viewportHeight * 0.12));
+  const absoluteTop = window.scrollY + rect.top;
+  const maxScrollTop = Math.max(0, documentHeight - viewportHeight);
+  const targetTooTall = rect.height > viewportHeight * 0.64;
+  const desiredTop = targetTooTall
+    ? absoluteTop - topMargin
+    : absoluteTop + rect.height / 2 - viewportHeight / 2;
+
+  window.scrollTo({
+    top: Math.max(0, Math.min(maxScrollTop, desiredTop)),
+    left: window.scrollX,
+    behavior: "auto",
+  });
+}
+
 function renderOnboardingStep(target) {
   clearOnboardingOverlay();
   const step = onboardingState.steps[onboardingState.stepIndex];
@@ -1069,39 +1095,45 @@ function renderOnboardingStep(target) {
 
   onboardingState.target = target;
   target.classList.add("zixi-onboarding-target");
-  target.scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
+  scrollOnboardingTargetIntoView(target);
 
-  const overlay = document.createElement("div");
-  overlay.className = "zixi-onboarding-overlay";
-  overlay.innerHTML = `
-    <div class="zixi-onboarding-scrim"></div>
-    <div class="zixi-onboarding-highlight" aria-hidden="true"></div>
-    <section class="zixi-onboarding-card" role="dialog" aria-live="polite" aria-label="Site introduction">
-      <span class="zixi-onboarding-arrow" aria-hidden="true"></span>
-      <div class="zixi-onboarding-kicker">Quick Tour</div>
-      <h2>${escapeHTML(step.title)}</h2>
-      <p>${escapeHTML(step.body)}</p>
-      <div class="zixi-onboarding-actions">
-        <button class="zixi-onboarding-skip" type="button">Skip</button>
-        <span class="zixi-onboarding-progress">${escapeHTML(step.progressLabel || `${onboardingState.stepIndex + 1} / ${onboardingState.steps.length}`)}</span>
-        <button class="zixi-onboarding-next${nextLabelClass}" type="button">${escapeHTML(nextLabel)}</button>
-      </div>
-    </section>
-  `;
-  document.body.appendChild(overlay);
-  document.body.classList.add("zixi-onboarding-active");
-  lockOnboardingScroll();
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (!onboardingState.active || onboardingState.target !== target) return;
 
-  const card = overlay.querySelector(".zixi-onboarding-card");
-  const highlight = overlay.querySelector(".zixi-onboarding-highlight");
-  const arrow = overlay.querySelector(".zixi-onboarding-arrow");
-  scheduleOnboardingPositionUpdates(target, card, highlight, arrow);
-  onboardingPositionHandler = () => positionOnboardingOverlay(target, card, highlight, arrow);
-  window.addEventListener("resize", onboardingPositionHandler);
-  window.addEventListener("scroll", onboardingPositionHandler, true);
+      const overlay = document.createElement("div");
+      overlay.className = "zixi-onboarding-overlay";
+      overlay.innerHTML = `
+        <div class="zixi-onboarding-scrim"></div>
+        <div class="zixi-onboarding-highlight" aria-hidden="true"></div>
+        <section class="zixi-onboarding-card" role="dialog" aria-live="polite" aria-label="Site introduction">
+          <span class="zixi-onboarding-arrow" aria-hidden="true"></span>
+          <div class="zixi-onboarding-kicker">Quick Tour</div>
+          <h2>${escapeHTML(step.title)}</h2>
+          <p>${escapeHTML(step.body)}</p>
+          <div class="zixi-onboarding-actions">
+            <button class="zixi-onboarding-skip" type="button">Skip</button>
+            <span class="zixi-onboarding-progress">${escapeHTML(step.progressLabel || `${onboardingState.stepIndex + 1} / ${onboardingState.steps.length}`)}</span>
+            <button class="zixi-onboarding-next${nextLabelClass}" type="button">${escapeHTML(nextLabel)}</button>
+          </div>
+        </section>
+      `;
+      document.body.appendChild(overlay);
+      document.body.classList.add("zixi-onboarding-active");
+      lockOnboardingScroll();
 
-  overlay.querySelector(".zixi-onboarding-skip")?.addEventListener("click", () => finishOnboarding(true));
-  overlay.querySelector(".zixi-onboarding-next")?.addEventListener("click", advanceOnboarding);
+      const card = overlay.querySelector(".zixi-onboarding-card");
+      const highlight = overlay.querySelector(".zixi-onboarding-highlight");
+      const arrow = overlay.querySelector(".zixi-onboarding-arrow");
+      scheduleOnboardingPositionUpdates(target, card, highlight, arrow);
+      onboardingPositionHandler = () => positionOnboardingOverlay(target, card, highlight, arrow);
+      window.addEventListener("resize", onboardingPositionHandler);
+      window.addEventListener("scroll", onboardingPositionHandler, true);
+
+      overlay.querySelector(".zixi-onboarding-skip")?.addEventListener("click", () => finishOnboarding(true));
+      overlay.querySelector(".zixi-onboarding-next")?.addEventListener("click", advanceOnboarding);
+    });
+  });
 }
 
 function showOnboardingStep(attempt = 0) {
