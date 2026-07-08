@@ -876,7 +876,13 @@ function isElementVisible(element) {
   if (!element) return false;
   const rect = element.getBoundingClientRect();
   const style = window.getComputedStyle(element);
-  return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+  return rect.width > 0
+    && rect.height > 0
+    && rect.right > 0
+    && rect.left < viewportWidth
+    && style.display !== "none"
+    && style.visibility !== "hidden";
 }
 
 function findVisibleElement(selectors) {
@@ -1005,7 +1011,7 @@ function renderOnboardingStep(target) {
   if (!step || !target) return;
 
   target.classList.add("zixi-onboarding-target");
-  target.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+  target.scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
 
   const overlay = document.createElement("div");
   overlay.className = "zixi-onboarding-overlay";
