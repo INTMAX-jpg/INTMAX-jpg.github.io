@@ -69,6 +69,8 @@ let analyticsEasterEggTimer = null;
 let analyticsEasterEggCleanupTimer = null;
 let onboardingRetryTimer = null;
 let onboardingPositionHandler = null;
+let onboardingPositionTimers = [];
+let onboardingScrollLocked = false;
 let onboardingLoginPromptShownThisPage = false;
 let onboardingUserTourShownThisPage = false;
 let onboardingState = {
@@ -872,6 +874,35 @@ function clearPendingOnboardingStep() {
   } catch (error) {}
 }
 
+function preventOnboardingScroll(event) {
+  if (onboardingState.active) event.preventDefault();
+}
+
+function preventOnboardingKeyboardScroll(event) {
+  const target = event.target;
+  if (target?.closest?.("input, textarea, select, [contenteditable='true']")) return;
+  const blockedKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End", " "];
+  if (blockedKeys.includes(event.key)) event.preventDefault();
+}
+
+function lockOnboardingScroll() {
+  if (onboardingScrollLocked) return;
+  onboardingScrollLocked = true;
+  document.documentElement.classList.add("zixi-onboarding-active");
+  window.addEventListener("wheel", preventOnboardingScroll, { passive: false });
+  window.addEventListener("touchmove", preventOnboardingScroll, { passive: false });
+  window.addEventListener("keydown", preventOnboardingKeyboardScroll, true);
+}
+
+function unlockOnboardingScroll() {
+  if (!onboardingScrollLocked) return;
+  onboardingScrollLocked = false;
+  window.removeEventListener("wheel", preventOnboardingScroll, { passive: false });
+  window.removeEventListener("touchmove", preventOnboardingScroll, { passive: false });
+  window.removeEventListener("keydown", preventOnboardingKeyboardScroll, true);
+  document.documentElement.classList.remove("zixi-onboarding-active");
+}
+
 function isElementVisible(element) {
   if (!element) return false;
   const rect = element.getBoundingClientRect();
@@ -953,6 +984,7 @@ function getUserOnboardingSteps() {
 function clearOnboardingOverlay() {
   window.clearTimeout(onboardingRetryTimer);
   onboardingRetryTimer = null;
+  clearOnboardingPositionTimers();
   if (onboardingPositionHandler) {
     window.removeEventListener("resize", onboardingPositionHandler);
     window.removeEventListener("scroll", onboardingPositionHandler, true);
@@ -960,7 +992,9 @@ function clearOnboardingOverlay() {
   }
   document.querySelectorAll(".zixi-onboarding-overlay").forEach((element) => element.remove());
   document.querySelectorAll(".zixi-onboarding-target").forEach((element) => element.classList.remove("zixi-onboarding-target"));
+  document.documentElement.classList.remove("zixi-onboarding-active");
   document.body.classList.remove("zixi-onboarding-active");
+  unlockOnboardingScroll();
   onboardingState.target = null;
 }
 
@@ -973,6 +1007,11 @@ function finishOnboarding(markComplete = true) {
   clearPendingOnboardingStep();
   onboardingState = { active: false, mode: "", stepIndex: 0, steps: [], target: null };
   clearOnboardingOverlay();
+}
+
+function clearOnboardingPositionTimers() {
+  onboardingPositionTimers.forEach((timer) => window.clearTimeout(timer));
+  onboardingPositionTimers = [];
 }
 
 function positionOnboardingOverlay(target, card, highlight, arrow) {
@@ -1006,6 +1045,21 @@ function positionOnboardingOverlay(target, card, highlight, arrow) {
   arrow.style.left = `${Math.max(22, Math.min(cardRect.width - 22, arrowLeft))}px`;
 }
 
+function scheduleOnboardingPositionUpdates(target, card, highlight, arrow) {
+  clearOnboardingPositionTimers();
+  const update = () => {
+    if (!onboardingState.active || onboardingState.target !== target || !document.body.contains(card)) return;
+    positionOnboardingOverlay(target, card, highlight, arrow);
+  };
+  requestAnimationFrame(() => {
+    update();
+    requestAnimationFrame(update);
+  });
+  [120, 360, 700].forEach((delay) => {
+    onboardingPositionTimers.push(window.setTimeout(update, delay));
+  });
+}
+
 function renderOnboardingStep(target) {
   clearOnboardingOverlay();
   const step = onboardingState.steps[onboardingState.stepIndex];
@@ -1013,6 +1067,7 @@ function renderOnboardingStep(target) {
   const nextLabel = step.nextLabel || (onboardingState.stepIndex === onboardingState.steps.length - 1 ? "Done" : "Next");
   const nextLabelClass = nextLabel.length > 7 ? " is-tight" : nextLabel.length > 4 ? " is-compact" : "";
 
+  onboardingState.target = target;
   target.classList.add("zixi-onboarding-target");
   target.scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
 
@@ -1035,11 +1090,12 @@ function renderOnboardingStep(target) {
   `;
   document.body.appendChild(overlay);
   document.body.classList.add("zixi-onboarding-active");
+  lockOnboardingScroll();
 
   const card = overlay.querySelector(".zixi-onboarding-card");
   const highlight = overlay.querySelector(".zixi-onboarding-highlight");
   const arrow = overlay.querySelector(".zixi-onboarding-arrow");
-  requestAnimationFrame(() => positionOnboardingOverlay(target, card, highlight, arrow));
+  scheduleOnboardingPositionUpdates(target, card, highlight, arrow);
   onboardingPositionHandler = () => positionOnboardingOverlay(target, card, highlight, arrow);
   window.addEventListener("resize", onboardingPositionHandler);
   window.addEventListener("scroll", onboardingPositionHandler, true);
