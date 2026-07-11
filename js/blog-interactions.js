@@ -962,9 +962,9 @@ function getUserOnboardingSteps() {
       selectors: [".home-likes-stat [data-home-likes-count]", ".home-likes-stat"],
     },
     {
-      title: "留下评论或留言",
-      body: "这里可以打开留言入口，登录后就能写下想说的话。",
-      selectors: [".home-comment-button", ".site-comments-stat"],
+      title: "查看历史留言",
+      body: "点击这里可以进入历史留言页，查看大家留下的评论与回复。",
+      selectors: ['.statistics a.site-comments-stat[href="/comments/"]'],
     },
     {
       title: "进入相册",
