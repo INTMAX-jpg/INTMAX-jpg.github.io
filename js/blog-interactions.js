@@ -61,6 +61,7 @@ const analyticsEasterEggStorageKey = "ZIXI_ANALYTICS_EASTER_EGG_SEEN";
 const onboardingLoginPromptStorageKey = "ZIXI_ONBOARDING_LOGIN_PROMPT_DISMISSED";
 const onboardingUserStoragePrefix = "ZIXI_ONBOARDING_DONE";
 const onboardingPendingStepStorageKey = "ZIXI_ONBOARDING_PENDING_STEP";
+const onboardingReturnHomeStorageKey = "ZIXI_ONBOARDING_RETURN_HOME";
 const onboardingAlwaysShowForTesting = true;
 let galleryNoteIntroTimer = null;
 let galleryNoteIntroCleanupTimer = null;
@@ -74,6 +75,7 @@ let onboardingPositionTimers = [];
 let onboardingScrollLocked = false;
 let onboardingLoginPromptShownThisPage = false;
 let onboardingUserTourShownThisPage = false;
+let onboardingPagePath = "";
 let onboardingState = {
   active: false,
   mode: "",
@@ -836,6 +838,7 @@ function markUserOnboardingComplete(user = currentSession?.user) {
   try {
     localStorage.setItem(getOnboardingUserKey(user), "true");
     sessionStorage.removeItem(onboardingPendingStepStorageKey);
+    sessionStorage.removeItem(onboardingReturnHomeStorageKey);
   } catch (error) {}
 }
 
@@ -872,6 +875,26 @@ function setPendingOnboardingStep(index) {
 function clearPendingOnboardingStep() {
   try {
     sessionStorage.removeItem(onboardingPendingStepStorageKey);
+  } catch (error) {}
+}
+
+function hasPendingOnboardingReturnHome() {
+  try {
+    return sessionStorage.getItem(onboardingReturnHomeStorageKey) === "true";
+  } catch (error) {
+    return false;
+  }
+}
+
+function setPendingOnboardingReturnHome() {
+  try {
+    sessionStorage.setItem(onboardingReturnHomeStorageKey, "true");
+  } catch (error) {}
+}
+
+function clearPendingOnboardingReturnHome() {
+  try {
+    sessionStorage.removeItem(onboardingReturnHomeStorageKey);
   } catch (error) {}
 }
 
@@ -938,6 +961,14 @@ function getDesktopGalleryNavSelector() {
   ];
 }
 
+function getHomeNavSelectors() {
+  return [
+    '.navbar-list .navbar-item a[href="/"]',
+    '.drawer-navbar-list a[href="/"]',
+    '.logo-title[href="/"]',
+  ];
+}
+
 function getLoginOnboardingSteps() {
   return [{
     title: "先登录或注册",
@@ -953,18 +984,23 @@ function getUserOnboardingSteps() {
   return [
     {
       title: "浏览博文卡片",
-      body: "这里会展示最新文章。点击卡片或 Read more 可以进入正文。",
+      body: "点击高亮的博文卡片进入正文，体验后会引导你返回并继续介绍。",
       selectors: [".home-article-list .home-article-item"],
+      interactive: true,
+      returnHomeAfterClick: true,
     },
     {
       title: "给博客点赞",
-      body: "喜欢这个小站时，可以点这里给 Zixi 一个鼓励。",
+      body: "点击高亮的点赞数字，马上体验爱心反馈，给 Zixi 一个鼓励。",
       selectors: [".home-likes-stat [data-home-likes-count]", ".home-likes-stat"],
+      interactive: true,
     },
     {
       title: "查看历史留言",
-      body: "点击这里可以进入历史留言页，查看大家留下的评论与回复。",
+      body: "点击高亮按钮进入历史留言页，可以查看回复，也可以亲自写一条留言。",
       selectors: ['.statistics a.site-comments-stat[href="/comments/"]'],
+      interactive: true,
+      returnHomeAfterClick: true,
     },
     {
       title: "进入相册",
@@ -975,10 +1011,38 @@ function getUserOnboardingSteps() {
     },
     {
       title: "给照片点赞",
-      body: "每张照片右下角都有爱心按钮，可以单独为喜欢的照片点赞。",
+      body: "点击高亮的爱心按钮，立即体验照片点赞效果。",
       selectors: [".gallery-photo-like"],
       path: "/masonry/",
+      interactive: true,
     },
+  ];
+}
+
+function getReturnHomeOnboardingSteps() {
+  const homeStep = {
+    title: "返回主界面",
+    body: "点击高亮的 HOME 返回主界面，介绍会从下一个组件继续。手机端可点击高亮的站点标题。",
+    selectors: getHomeNavSelectors(),
+    nextLabel: "返回 Home",
+    progressLabel: "继续介绍",
+    action: "return-home",
+    interactive: true,
+  };
+
+  if (!isCommentsPage()) return [homeStep];
+
+  return [
+    {
+      title: "写下你的留言",
+      body: "点击高亮的“写留言”打开留言框；体验完成后关闭留言框，会继续引导你返回 HOME。",
+      selectors: [".guestbook-history-new"],
+      nextLabel: "稍后再写",
+      progressLabel: "互动体验",
+      interactive: true,
+      advanceAfterInteraction: true,
+    },
+    homeStep,
   ];
 }
 
@@ -1006,8 +1070,23 @@ function finishOnboarding(markComplete = true) {
     markUserOnboardingComplete();
   }
   clearPendingOnboardingStep();
+  clearPendingOnboardingReturnHome();
   onboardingState = { active: false, mode: "", stepIndex: 0, steps: [], target: null };
   clearOnboardingOverlay();
+}
+
+function resetOnboardingForNavigation() {
+  onboardingState = { active: false, mode: "", stepIndex: 0, steps: [], target: null };
+  clearOnboardingOverlay();
+}
+
+function syncOnboardingPageState() {
+  const pagePath = window.location.pathname.replace(/\/index\.html$/, "/");
+  if (pagePath === onboardingPagePath) return;
+  onboardingPagePath = pagePath;
+  onboardingLoginPromptShownThisPage = false;
+  onboardingUserTourShownThisPage = false;
+  if (onboardingState.active) resetOnboardingForNavigation();
 }
 
 function clearOnboardingPositionTimers() {
@@ -1087,6 +1166,35 @@ function scrollOnboardingTargetIntoView(target) {
   });
 }
 
+function activateOnboardingTarget(step, target) {
+  if (!step?.interactive || !target) return;
+
+  if (step.action === "return-home") {
+    clearPendingOnboardingReturnHome();
+    resetOnboardingForNavigation();
+    target.click();
+    return;
+  }
+
+  if (step.returnHomeAfterClick) {
+    setPendingOnboardingStep(onboardingState.stepIndex + 1);
+    setPendingOnboardingReturnHome();
+    resetOnboardingForNavigation();
+    target.click();
+    return;
+  }
+
+  if (step.advanceAfterInteraction) {
+    clearOnboardingOverlay();
+    target.click();
+    onboardingState.stepIndex += 1;
+    onboardingRetryTimer = window.setTimeout(showOnboardingStep, 240);
+    return;
+  }
+
+  target.click();
+}
+
 function renderOnboardingStep(target) {
   clearOnboardingOverlay();
   const step = onboardingState.steps[onboardingState.stepIndex];
@@ -1103,7 +1211,7 @@ function renderOnboardingStep(target) {
       if (!onboardingState.active || onboardingState.target !== target) return;
 
       const overlay = document.createElement("div");
-      overlay.className = "zixi-onboarding-overlay";
+      overlay.className = `zixi-onboarding-overlay${step.interactive ? " is-target-interactive" : ""}`;
       overlay.innerHTML = `
         <div class="zixi-onboarding-scrim"></div>
         <div class="zixi-onboarding-highlight" aria-hidden="true"></div>
@@ -1126,6 +1234,18 @@ function renderOnboardingStep(target) {
       const card = overlay.querySelector(".zixi-onboarding-card");
       const highlight = overlay.querySelector(".zixi-onboarding-highlight");
       const arrow = overlay.querySelector(".zixi-onboarding-arrow");
+      if (step.interactive) {
+        highlight.removeAttribute("aria-hidden");
+        highlight.setAttribute("role", "button");
+        highlight.setAttribute("tabindex", "0");
+        highlight.setAttribute("aria-label", `体验：${step.title}`);
+        highlight.addEventListener("click", () => activateOnboardingTarget(step, target));
+        highlight.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          activateOnboardingTarget(step, target);
+        });
+      }
       scheduleOnboardingPositionUpdates(target, card, highlight, arrow);
       onboardingPositionHandler = () => positionOnboardingOverlay(target, card, highlight, arrow);
       window.addEventListener("resize", onboardingPositionHandler);
@@ -1198,6 +1318,13 @@ function advanceOnboarding() {
     return;
   }
 
+  if (step.action === "return-home") {
+    clearPendingOnboardingReturnHome();
+    resetOnboardingForNavigation();
+    window.location.href = "/";
+    return;
+  }
+
   if (step.action === "go-gallery") {
     onboardingState.stepIndex += 1;
     setPendingOnboardingStep(onboardingState.stepIndex);
@@ -1212,6 +1339,7 @@ function advanceOnboarding() {
   }
 
   onboardingState.stepIndex += 1;
+  if (onboardingState.mode === "user") setPendingOnboardingStep(onboardingState.stepIndex);
   showOnboardingStep();
 }
 
@@ -1231,20 +1359,37 @@ function maybeShowLoginOnboarding() {
 function maybeStartUserOnboarding(session = currentSession) {
   const user = session?.user;
   if (!user) return;
-  if (onboardingAlwaysShowForTesting && onboardingUserTourShownThisPage) return;
-  if (!onboardingAlwaysShowForTesting && hasCompletedUserOnboarding(user)) return;
 
   const pendingStep = getPendingOnboardingStep();
+  const shouldReturnHome = hasPendingOnboardingReturnHome();
+  if (shouldReturnHome && !isHomePage()) {
+    if (onboardingUserTourShownThisPage) return;
+    onboardingUserTourShownThisPage = true;
+    window.setTimeout(() => {
+      if (currentSession?.user?.id === user.id && hasPendingOnboardingReturnHome() && !isHomePage()) {
+        startOnboarding("return-home", getReturnHomeOnboardingSteps(), 0);
+      }
+    }, 700);
+    return;
+  }
+
+  if (shouldReturnHome && isHomePage()) clearPendingOnboardingReturnHome();
+  if (onboardingUserTourShownThisPage) return;
+  if (!onboardingAlwaysShowForTesting && hasCompletedUserOnboarding(user)) return;
+
   const shouldStartOnGallery = pendingStep > 0 && isGalleryPage();
+  const shouldResumeOnHome = pendingStep > 0 && isHomePage();
   if (!isHomePage() && !shouldStartOnGallery) {
     clearPendingOnboardingStep();
+    clearPendingOnboardingReturnHome();
     return;
   }
 
   onboardingUserTourShownThisPage = true;
   window.setTimeout(() => {
     if (currentSession?.user?.id === user.id && (onboardingAlwaysShowForTesting || !hasCompletedUserOnboarding(user))) {
-      startOnboarding("user", getUserOnboardingSteps(), shouldStartOnGallery ? pendingStep : 0);
+      const startIndex = shouldStartOnGallery || shouldResumeOnHome ? pendingStep : 0;
+      startOnboarding("user", getUserOnboardingSteps(), startIndex);
     }
   }, 900);
 }
@@ -4573,6 +4718,7 @@ function disableContextMenu() {
 }
 
 function initBlogInteractions() {
+  syncOnboardingPageState();
   disableContextMenu();
   installAnalyticsListeners();
   installDwellTimeListeners();
