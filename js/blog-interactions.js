@@ -1237,8 +1237,7 @@ function maybeStartUserOnboarding(session = currentSession) {
   const pendingStep = getPendingOnboardingStep();
   const shouldStartOnGallery = pendingStep > 0 && isGalleryPage();
   if (!isHomePage() && !shouldStartOnGallery) {
-    setPendingOnboardingStep(0);
-    window.location.href = "/";
+    clearPendingOnboardingStep();
     return;
   }
 
