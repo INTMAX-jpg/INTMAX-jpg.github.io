@@ -65,6 +65,7 @@ const onboardingReturnHomeStorageKey = "ZIXI_ONBOARDING_RETURN_HOME";
 const onboardingAlwaysShowForTesting = true;
 let galleryNoteIntroTimer = null;
 let galleryNoteIntroCleanupTimer = null;
+let galleryNoteScrollLocked = false;
 let homeNoteIntroTimer = null;
 let homeNoteIntroCleanupTimer = null;
 let analyticsEasterEggTimer = null;
@@ -465,6 +466,35 @@ function ensureGalleryNoteButton() {
   }
 }
 
+function preventGalleryNoteScroll(event) {
+  event.preventDefault();
+}
+
+function preventGalleryNoteKeyboardScroll(event) {
+  const target = event.target;
+  if (target?.closest?.("input, textarea, select, [contenteditable='true']")) return;
+  const blockedKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End", " "];
+  if (blockedKeys.includes(event.key)) event.preventDefault();
+}
+
+function lockGalleryNoteScroll() {
+  if (galleryNoteScrollLocked) return;
+  galleryNoteScrollLocked = true;
+  document.documentElement.classList.add("zixi-gallery-note-active");
+  window.addEventListener("wheel", preventGalleryNoteScroll, { passive: false });
+  window.addEventListener("touchmove", preventGalleryNoteScroll, { passive: false });
+  window.addEventListener("keydown", preventGalleryNoteKeyboardScroll, true);
+}
+
+function unlockGalleryNoteScroll() {
+  if (!galleryNoteScrollLocked) return;
+  galleryNoteScrollLocked = false;
+  window.removeEventListener("wheel", preventGalleryNoteScroll, { passive: false });
+  window.removeEventListener("touchmove", preventGalleryNoteScroll, { passive: false });
+  window.removeEventListener("keydown", preventGalleryNoteKeyboardScroll, true);
+  document.documentElement.classList.remove("zixi-gallery-note-active");
+}
+
 function clearGalleryNoteIntro() {
   window.clearTimeout(galleryNoteIntroTimer);
   window.clearTimeout(galleryNoteIntroCleanupTimer);
@@ -472,6 +502,7 @@ function clearGalleryNoteIntro() {
   galleryNoteIntroCleanupTimer = null;
   document.querySelectorAll(".gallery-note-intro").forEach((element) => element.remove());
   document.body.classList.remove("gallery-note-intro-active");
+  unlockGalleryNoteScroll();
   removeGalleryNoteButton();
 }
 
@@ -546,6 +577,7 @@ function showGalleryNoteIntro(options = {}) {
   const overlay = createGalleryNoteIntroOverlay();
   document.body.appendChild(overlay);
   document.body.classList.add("gallery-note-intro-active");
+  lockGalleryNoteScroll();
 
   const leaveDelay = getHandwrittenNoteLeaveDelay(overlay.querySelector(".gallery-note-paper p"));
   galleryNoteIntroTimer = window.setTimeout(() => {
@@ -557,6 +589,7 @@ function showGalleryNoteIntro(options = {}) {
   galleryNoteIntroCleanupTimer = window.setTimeout(() => {
     overlay.remove();
     document.body.classList.remove("gallery-note-intro-active");
+    unlockGalleryNoteScroll();
     ensureGalleryNoteButton();
   }, leaveDelay + 850);
 }
@@ -1125,18 +1158,22 @@ function positionOnboardingOverlay(target, card, highlight, arrow) {
   arrow.style.left = `${Math.max(22, Math.min(cardRect.width - 22, arrowLeft))}px`;
 }
 
-function scheduleOnboardingPositionUpdates(target, card, highlight, arrow) {
+function scheduleOnboardingReveal(target, card, highlight, arrow, overlay) {
   clearOnboardingPositionTimers();
   const update = () => {
     if (!onboardingState.active || onboardingState.target !== target || !document.body.contains(card)) return;
     positionOnboardingOverlay(target, card, highlight, arrow);
   };
   requestAnimationFrame(() => {
-    update();
-    requestAnimationFrame(update);
-  });
-  [120, 360, 700].forEach((delay) => {
-    onboardingPositionTimers.push(window.setTimeout(update, delay));
+    requestAnimationFrame(() => {
+      if (!onboardingState.active || onboardingState.target !== target || !document.body.contains(overlay)) return;
+      update();
+      onboardingPositionTimers.push(window.setTimeout(() => {
+        if (!onboardingState.active || onboardingState.target !== target || !document.body.contains(overlay)) return;
+        update();
+        overlay.classList.add("is-positioned");
+      }, 180));
+    });
   });
 }
 
@@ -1205,6 +1242,7 @@ function renderOnboardingStep(target) {
   onboardingState.target = target;
   target.classList.add("zixi-onboarding-target");
   scrollOnboardingTargetIntoView(target);
+  lockOnboardingScroll();
 
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
@@ -1229,7 +1267,6 @@ function renderOnboardingStep(target) {
       `;
       document.body.appendChild(overlay);
       document.body.classList.add("zixi-onboarding-active");
-      lockOnboardingScroll();
 
       const card = overlay.querySelector(".zixi-onboarding-card");
       const highlight = overlay.querySelector(".zixi-onboarding-highlight");
@@ -1246,7 +1283,7 @@ function renderOnboardingStep(target) {
           activateOnboardingTarget(step, target);
         });
       }
-      scheduleOnboardingPositionUpdates(target, card, highlight, arrow);
+      scheduleOnboardingReveal(target, card, highlight, arrow, overlay);
       onboardingPositionHandler = () => positionOnboardingOverlay(target, card, highlight, arrow);
       window.addEventListener("resize", onboardingPositionHandler);
       window.addEventListener("scroll", onboardingPositionHandler, true);
@@ -1931,6 +1968,7 @@ function injectAuthorEditorModal() {
         <div class="blog-author-editor-shell">
           <textarea class="blog-author-markdown-input" rows="16" spellcheck="true" placeholder="# Start writing..."></textarea>
           <div class="blog-author-preview markdown-body" hidden></div>
+          <p class="blog-author-inline-status" role="status" aria-live="polite"></p>
         </div>
         <div class="blog-author-actions">
           <button class="blog-author-secondary" type="button" data-author-preview>
@@ -1999,11 +2037,13 @@ function closeAuthorEditor() {
   document.body.classList.remove("blog-author-modal-open");
 }
 
-function setAuthorStatus(message, isError = false) {
-  const status = document.querySelector(".blog-author-status");
-  if (!status) return;
-  status.textContent = message;
-  status.classList.toggle("is-error", isError);
+function setAuthorStatus(message, isError = false, isBusy = false) {
+  document.querySelectorAll(".blog-author-status, .blog-author-inline-status").forEach((status) => {
+    status.textContent = message;
+    status.classList.toggle("is-error", isError);
+    status.classList.toggle("is-busy", isBusy);
+    status.classList.toggle("is-visible", Boolean(message));
+  });
 }
 
 function setAuthorVisibility(value) {
@@ -2155,6 +2195,40 @@ function getDataUrlImageSources(html) {
     .filter(Boolean);
 }
 
+function getImageExtensionFromUrl(value) {
+  try {
+    const pathname = new URL(String(value || "")).pathname;
+    const match = pathname.toLowerCase().match(/\.([a-z0-9]+)$/);
+    const extension = match?.[1] || "";
+    if (/^(png|jpe?g|gif|webp|avif|svg)$/.test(extension)) return extension === "jpeg" ? "jpg" : extension;
+  } catch (error) {}
+  return "";
+}
+
+function getRemoteHtmlImageSources(html) {
+  const urls = [];
+  const pattern = /<img\b[^>]*\bsrc=["'](https?:\/\/[^"']+)["']/gi;
+  let match = pattern.exec(String(html || ""));
+  while (match) {
+    urls.push(match[1].replace(/&amp;/g, "&"));
+    match = pattern.exec(String(html || ""));
+  }
+  return urls.map((url, index) => {
+    const extension = getImageExtensionFromUrl(url) || "png";
+    let name = `pasted-image-${index + 1}.${extension}`;
+    try {
+      const filename = new URL(url).pathname.split("/").pop();
+      if (filename && /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(filename)) name = filename;
+    } catch (error) {}
+    return {
+      kind: "remote-url",
+      url,
+      name,
+      extension,
+    };
+  });
+}
+
 function collectImageFilesFromDataTransfer(dataTransfer) {
   const items = Array.from(dataTransfer?.items || []);
   const itemFiles = items
@@ -2175,15 +2249,22 @@ function collectPastedImageSources(event) {
     name: file.name || "pasted-image",
     type: file.type || "",
   }));
-  const htmlSources = getDataUrlImageSources(dataTransfer?.getData?.("text/html"));
-  return [...fileSources, ...htmlSources].filter((source, index, sources) => {
+  const html = dataTransfer?.getData?.("text/html");
+  const htmlSources = getDataUrlImageSources(html);
+  const directSources = [...fileSources, ...htmlSources];
+  const sources = directSources.length ? directSources : getRemoteHtmlImageSources(html);
+  return sources.filter((source, index, allSources) => {
     const key = source.kind === "file"
       ? `${source.name}:${source.file?.size || 0}:${source.type}`
-      : `${source.name}:${source.content?.slice(0, 80)}`;
-    return sources.findIndex((candidate) => {
+      : source.kind === "data-url"
+        ? `${source.name}:${source.content?.slice(0, 80)}`
+        : source.url;
+    return allSources.findIndex((candidate) => {
       const candidateKey = candidate.kind === "file"
         ? `${candidate.name}:${candidate.file?.size || 0}:${candidate.type}`
-        : `${candidate.name}:${candidate.content?.slice(0, 80)}`;
+        : candidate.kind === "data-url"
+          ? `${candidate.name}:${candidate.content?.slice(0, 80)}`
+          : candidate.url;
       return candidateKey === key;
     }) === index;
   });
@@ -2198,8 +2279,21 @@ function dataTransferMayContainImages(dataTransfer) {
   return types.some((type) => type === "files" || type.startsWith("image/")) || /<img\b/i.test(html);
 }
 
+function dataTransferHasNoTypes(dataTransfer) {
+  const types = [
+    ...Array.from(dataTransfer?.types || []),
+    ...Array.from(dataTransfer?.items || []).map((item) => item.type),
+  ].filter(Boolean);
+  return types.length === 0;
+}
+
 async function collectAsyncClipboardImageSources() {
-  if (!window.isSecureContext || !navigator.clipboard?.read) return [];
+  if (!window.isSecureContext) {
+    throw new Error("图片剪贴板读取需要 HTTPS 页面。请在公开站点中重试。");
+  }
+  if (!navigator.clipboard?.read) {
+    throw new Error("当前浏览器不支持读取图片剪贴板。请直接粘贴截图或拖放图片文件。");
+  }
 
   try {
     const clipboardItems = await navigator.clipboard.read();
@@ -2224,13 +2318,17 @@ async function collectAsyncClipboardImageSources() {
     return sources;
   } catch (error) {
     console.warn("Async clipboard image read failed", error);
-    return [];
+    if (error?.name === "NotAllowedError") {
+      throw new Error("浏览器未授予剪贴板图片读取权限。请允许权限后重新粘贴。");
+    }
+    throw new Error("无法读取剪贴板中的图片。请重新复制图片或使用截图后再试。");
   }
 }
 
 function getActiveAuthorTextarea(event) {
   const target = event?.target;
   if (target?.matches?.(".blog-author-markdown-input")) return target;
+  if (target) return null;
   const modal = document.querySelector(".blog-author-modal:not([hidden])");
   return modal?.querySelector(".blog-author-markdown-input") || null;
 }
@@ -2732,38 +2830,80 @@ async function commitFilesToGithub(files, message) {
   return commit;
 }
 
+async function resolvePastedImageSource(source) {
+  if (source.kind !== "remote-url") return source;
+
+  let response;
+  try {
+    response = await fetch(source.url, {
+      mode: "cors",
+      credentials: "omit",
+      cache: "no-store",
+    });
+  } catch (error) {
+    throw new Error("图片来源不允许浏览器下载。请复制图片文件本身或重新截取屏幕后粘贴。");
+  }
+
+  if (!response.ok) {
+    throw new Error(`图片下载失败（${response.status}）。请复制图片文件本身或重新截取屏幕后粘贴。`);
+  }
+
+  const file = await response.blob();
+  const type = file.type || source.type || "";
+  if (!isImageFile({ name: source.name, type })) {
+    throw new Error("剪贴板中的图片链接未返回可上传的图片文件。请复制图片文件本身或重新截取屏幕后粘贴。");
+  }
+
+  return {
+    ...source,
+    kind: "file",
+    file,
+    type,
+    extension: getImageExtensionFromMime(type) || source.extension || getImageExtensionFromUrl(source.url) || "png",
+  };
+}
+
 async function uploadAuthorMarkdownImages(event, sources) {
   if (!sources.length) return;
   const textarea = getActiveAuthorTextarea(event);
   if (!textarea) return;
 
   event.preventDefault();
+  if (textarea.dataset.authorImageUpload === "true") {
+    setAuthorStatus("图片正在上传，请等待当前任务完成。", false, true);
+    return;
+  }
   if (!authorSessionState.allowed) {
-    setAuthorStatus("Only INTMAX-jpg can upload pasted images.", true);
+    setAuthorStatus("只有 INTMAX-jpg 可以上传粘贴图片。", true);
     return;
   }
   if (!authorSessionState.token) {
-    setAuthorStatus("GitHub write token is missing. Please sign out, then sign in with GitHub again and approve repository access.", true);
+    setAuthorStatus("缺少 GitHub 写入权限。请退出后使用 GitHub 重新登录，并授权仓库访问。", true);
     return;
   }
 
+  textarea.dataset.authorImageUpload = "true";
   const placeholderId = Date.now().toString(36);
   const placeholders = sources.map((source, index) => `![uploading ${getPastedImageAlt(source, `image-${index + 1}`)}](uploading-github-image-${placeholderId}-${index + 1})`);
   insertTextAtTextareaSelection(textarea, placeholders.join("\n"));
-  setAuthorStatus(`Uploading ${sources.length} image${sources.length > 1 ? "s" : ""} to GitHub...`);
+  setAuthorStatus(`已检测到 ${sources.length} 张图片，正在准备上传…`, false, true);
 
   try {
-    const uploads = await Promise.all(sources.map(async (source, index) => {
+    const uploads = [];
+    for (let index = 0; index < sources.length; index += 1) {
+      setAuthorStatus(`正在准备图片 ${index + 1}/${sources.length}…`, false, true);
+      const source = await resolvePastedImageSource(sources[index]);
       const path = buildPastedImagePath(source, index);
       const content = source.kind === "data-url" ? source.content : await fileToBase64(source.file);
-      return {
+      uploads.push({
         path,
         content,
         encoding: "base64",
         markdown: `![${getPastedImageAlt(source, `image-${index + 1}`)}](/${path})`,
-      };
-    }));
+      });
+    }
 
+    setAuthorStatus("正在提交图片到 GitHub…", false, true);
     const commit = await commitFilesToGithub(
       uploads.map(({ path, content, encoding }) => ({ path, content, encoding })),
       `Upload pasted post image${uploads.length > 1 ? "s" : ""}: ${getCurrentAuthorSlug()}`,
@@ -2772,13 +2912,15 @@ async function uploadAuthorMarkdownImages(event, sources) {
     uploads.forEach((upload, index) => {
       replaceTextareaText(textarea, placeholders[index], upload.markdown);
     });
-    setAuthorStatus(`Image upload committed ${commit.sha.slice(0, 7)}. GitHub Pages may need a moment to serve the file.`);
+    setAuthorStatus(`图片已上传（${commit.sha.slice(0, 7)}），GitHub Pages 正在更新。`);
   } catch (error) {
     console.warn("Pasted image upload failed", error);
     placeholders.forEach((placeholder) => {
       replaceTextareaText(textarea, placeholder, "");
     });
-    setAuthorStatus(error.message || "Image upload failed.", true);
+    setAuthorStatus(`图片上传失败：${error.message || "请稍后重试。"}`, true);
+  } finally {
+    delete textarea.dataset.authorImageUpload;
   }
 }
 
@@ -2794,13 +2936,28 @@ async function handleAuthorMarkdownPaste(event) {
   const textarea = getActiveAuthorTextarea(event);
   if (!textarea) return;
 
+  const dataTransfer = event.clipboardData;
   let sources = collectPastedImageSources(event);
-  if (!sources.length && dataTransferMayContainImages(event.clipboardData)) {
+  const imageHint = dataTransferMayContainImages(dataTransfer);
+  const plainText = String(dataTransfer?.getData?.("text/plain") || "");
+  const shouldTryAsyncClipboard = !sources.length && (imageHint || (dataTransferHasNoTypes(dataTransfer) && !plainText));
+  if (shouldTryAsyncClipboard) {
     event.preventDefault();
-    setAuthorStatus("Reading image from clipboard...");
-    sources = await collectAsyncClipboardImageSources();
+    setAuthorStatus("检测到图片粘贴，正在读取剪贴板…", false, true);
+    try {
+      sources = await collectAsyncClipboardImageSources();
+    } catch (error) {
+      setAuthorStatus(`图片读取失败：${error.message || "请重新复制图片后再试。"}`, true);
+      return;
+    }
   }
-  if (!sources.length) return;
+  if (!sources.length) {
+    if (imageHint || shouldTryAsyncClipboard) {
+      event.preventDefault();
+      setAuthorStatus("未读取到可上传的图片。请复制图片文件本身或重新截取屏幕后粘贴。", true);
+    }
+    return;
+  }
   await uploadAuthorMarkdownImages(event, sources);
 }
 
@@ -2811,6 +2968,7 @@ async function handleAuthorMarkdownBeforeInput(event) {
   const files = collectImageFilesFromDataTransfer(event.dataTransfer);
   if (!files.length) return;
   const sources = files.map((file) => ({ kind: "file", file, name: file.name || "pasted-image", type: file.type || "" }));
+  setAuthorStatus(`检测到 ${sources.length} 张图片，准备上传…`, false, true);
   await uploadAuthorMarkdownImages(event, sources);
 }
 
@@ -2820,6 +2978,7 @@ async function handleAuthorMarkdownDrop(event) {
   const files = collectImageFilesFromDataTransfer(event.dataTransfer);
   if (!files.length) return;
   const sources = files.map((file) => ({ kind: "file", file, name: file.name || "dropped-image", type: file.type || "" }));
+  setAuthorStatus(`检测到 ${sources.length} 张图片，准备上传…`, false, true);
   await uploadAuthorMarkdownImages(event, sources);
 }
 
