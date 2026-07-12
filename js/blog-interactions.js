@@ -4884,27 +4884,99 @@ function renderEasterEggDiscoveryBanner(discovery, summary) {
     </section>
   `;
 }
+
+function renderAnalyticsBarRow(title, item, max, className = "") {
+  const width = Math.max(8, Math.round((item.count / max) * 100));
+  const rowClass = className ? ` ${className}` : "";
+  return `
+    <div class="visitor-analytics-bar-row${rowClass}">
+      <div class="visitor-analytics-bar-meta">
+        <span class="visitor-analytics-item-label">
+          ${renderAnalyticsItemIcon(title, item.label)}
+          <span>${escapeHTML(item.label)}</span>
+        </span>
+        <strong>${item.count}</strong>
+      </div>
+      <div class="visitor-analytics-track" aria-hidden="true">
+        <span style="width:${width}%"></span>
+      </div>
+    </div>
+  `;
+}
+
+function groupAnalyticsRegions(items) {
+  const groups = new Map();
+
+  normalizeAnalyticsList(items).forEach((item) => {
+    const parts = item.label.split("/").map((part) => part.trim()).filter(Boolean);
+    const country = parts.shift() || "Unknown";
+    const location = parts.join(" / ");
+    const group = groups.get(country) || { label: country, count: 0, locations: new Map() };
+    group.count += item.count;
+
+    if (location) {
+      const existing = group.locations.get(location) || 0;
+      group.locations.set(location, existing + item.count);
+    }
+    groups.set(country, group);
+  });
+
+  return [...groups.values()]
+    .map((group) => ({
+      label: group.label,
+      count: group.count,
+      locations: [...group.locations.entries()]
+        .map(([label, count]) => ({ label, count }))
+        .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label)),
+    }))
+    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label));
+}
+
+function renderRegionAnalyticsBars(items, iconClass) {
+  const groups = groupAnalyticsRegions(items);
+  const max = groups.reduce((value, item) => Math.max(value, item.count), 0) || 1;
+  const rows = groups.length
+    ? groups.map((group) => {
+      const countryWidth = Math.max(8, Math.round((group.count / max) * 100));
+      const locationMax = group.locations.reduce((value, item) => Math.max(value, item.count), 0) || 1;
+      const locationRows = group.locations.length
+        ? group.locations.map((item) => renderAnalyticsBarRow("Regions", item, locationMax, "is-region-detail")).join("")
+        : '<div class="visitor-analytics-region-empty">No more detailed location data.</div>';
+
+      return `
+        <details class="visitor-analytics-region-group">
+          <summary aria-label="Show locations in ${escapeHTML(group.label)}">
+            <span class="visitor-analytics-region-summary-meta">
+              <span class="visitor-analytics-item-label">
+                ${renderAnalyticsItemIcon("Regions", group.label)}
+                <span>${escapeHTML(group.label)}</span>
+              </span>
+              <span class="visitor-analytics-region-summary-count"><strong>${group.count}</strong><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span>
+            </span>
+            <span class="visitor-analytics-track" aria-hidden="true"><span style="width:${countryWidth}%"></span></span>
+          </summary>
+          <div class="visitor-analytics-region-details">${locationRows}</div>
+        </details>
+      `;
+    }).join("")
+    : '<div class="visitor-analytics-empty">No data yet.</div>';
+
+  return `
+    <section class="visitor-analytics-panel">
+      <div class="visitor-analytics-panel-title">
+        <i class="${iconClass}" aria-hidden="true"></i>
+        <h2>Regions</h2>
+      </div>
+      <div class="visitor-analytics-region-groups">${rows}</div>
+    </section>
+  `;
+}
+
 function renderAnalyticsBars(title, items, iconClass) {
   const normalized = normalizeAnalyticsList(items);
   const max = normalized.reduce((value, item) => Math.max(value, item.count), 0) || 1;
   const rows = normalized.length
-    ? normalized.map((item) => {
-      const width = Math.max(8, Math.round((item.count / max) * 100));
-      return `
-        <div class="visitor-analytics-bar-row">
-          <div class="visitor-analytics-bar-meta">
-            <span class="visitor-analytics-item-label">
-              ${renderAnalyticsItemIcon(title, item.label)}
-              <span>${escapeHTML(item.label)}</span>
-            </span>
-            <strong>${item.count}</strong>
-          </div>
-          <div class="visitor-analytics-track" aria-hidden="true">
-            <span style="width:${width}%"></span>
-          </div>
-        </div>
-      `;
-    }).join("")
+    ? normalized.map((item) => renderAnalyticsBarRow(title, item, max)).join("")
     : '<div class="visitor-analytics-empty">No data yet.</div>';
 
   return `
@@ -4992,7 +5064,7 @@ function renderVisitorAnalyticsSummary(summary, discovery = {}) {
     </section>
     ${renderDwellTimePanel(summary)}
     <div class="visitor-analytics-grid">
-      ${renderAnalyticsBars("Regions", summary.regions, "fa-solid fa-location-dot")}
+      ${renderRegionAnalyticsBars(summary.regions, "fa-solid fa-location-dot")}
       ${renderAnalyticsBars("Browsers", summary.browsers, "fa-regular fa-window-maximize")}
       ${renderAnalyticsBars("Systems", summary.systems, "fa-solid fa-laptop")}
       ${renderAnalyticsBars("Devices", summary.devices, "fa-solid fa-desktop")}
