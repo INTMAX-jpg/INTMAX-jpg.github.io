@@ -43,6 +43,7 @@ let activePostContext = null;
 let authorSessionState = { allowed: false, token: "", login: "", checkedToken: "" };
 let activeAuthorPost = null;
 let authorEditorClipboardHandlersInstalled = false;
+let authorPreviewResourceVersion = "";
 let galleryPreloadScheduleStarted = false;
 let analyticsListenerInstalled = false;
 let lastTrackedPageKey = "";
@@ -1999,6 +2000,10 @@ function injectAuthorEditorModal() {
             <i class="fa-regular fa-eye" aria-hidden="true"></i>
             <span>Preview</span>
           </button>
+          <button class="blog-author-secondary" type="button" data-author-refresh-preview title="重新请求预览中的图片资源">
+            <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i>
+            <span>刷新预览</span>
+          </button>
           <button class="blog-author-primary" type="button" data-author-save>
             <i class="fa-regular fa-code-commit" aria-hidden="true"></i>
             <span>保存并commit</span>
@@ -2022,6 +2027,8 @@ function injectAuthorEditorModal() {
     button.addEventListener("click", () => setAuthorVisibility(button.dataset.authorVisibility || "visible"));
   });
   modal.querySelector("[data-author-preview]")?.addEventListener("click", toggleAuthorPreview);
+  modal.querySelector("[data-author-refresh-preview]")?.addEventListener("click", refreshAuthorPreview);
+  modal.querySelector(".blog-author-preview")?.addEventListener("click", handleAuthorPreviewClick);
   modal.querySelector("[data-author-save]")?.addEventListener("click", saveAuthorPost);
 }
 
@@ -2042,6 +2049,7 @@ function openAuthorEditor(post = null) {
   slugInput.value = post?.slug || "";
   slugInput.dataset.edited = post?.slug ? "true" : "false";
   markdownInput.value = post?.markdown || "";
+  authorPreviewResourceVersion = "";
   if (preview) {
     preview.hidden = true;
     preview.innerHTML = "";
@@ -2357,16 +2365,46 @@ function getActiveAuthorTextarea(event) {
   return modal?.querySelector(".blog-author-markdown-input") || null;
 }
 
-function inlineMarkdown(value) {
+function normalizeAuthorImagePath(value) {
+  const raw = String(value || "")
+    .trim()
+    .replace(/^<|>$/g, "")
+    .replace(/&amp;/g, "&")
+    .split(/[?#]/, 1)[0]
+    .replace(/^https?:\/\/[^/]+/i, "")
+    .replace(/^\/+/, "");
+  return raw.includes("..") ? "" : raw;
+}
+
+function getManagedAuthorImagePath(value) {
+  const path = normalizeAuthorImagePath(value);
+  const directory = `${authorEditorConfig.imageDir}/`;
+  return path.startsWith(directory) ? path : "";
+}
+
+function appendAuthorPreviewResourceVersion(source, options) {
+  if (!options?.authorPreview || !options.resourceVersion || !getManagedAuthorImagePath(source)) return source;
+  return `${source}${source.includes("?") ? "&amp;" : "?"}zixi_preview=${options.resourceVersion}`;
+}
+
+function buildAuthorPreviewImage(alt, source, options) {
+  const path = options?.authorPreview ? getManagedAuthorImagePath(source) : "";
+  const previewSource = appendAuthorPreviewResourceVersion(source, options);
+  if (!path) return `<img alt="${alt}" src="${previewSource}">`;
+
+  return `<span class="blog-author-preview-image"><img alt="${alt}" src="${previewSource}"><button class="blog-author-preview-image-delete" type="button" data-author-delete-image="${path}" aria-label="删除此图片" title="删除此图片"><i class="fa-solid fa-trash-can" aria-hidden="true"></i></button></span>`;
+}
+
+function inlineMarkdown(value, options = {}) {
   return escapeHTML(value)
     .replace(/`([^`]+)`/g, "<code>$1</code>")
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/\*([^*]+)\*/g, "<em>$1</em>")
-    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2">')
+    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, alt, source) => buildAuthorPreviewImage(alt, source, options))
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a class="link" target="_blank" rel="noopener" href="$2">$1<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a>');
 }
 
-function markdownToHtml(markdown) {
+function markdownToHtml(markdown, options = {}) {
   const lines = String(markdown || "").replace(/\r\n/g, "\n").split("\n");
   const html = [];
   let paragraph = [];
@@ -2377,7 +2415,7 @@ function markdownToHtml(markdown) {
 
   const flushParagraph = () => {
     if (!paragraph.length) return;
-    html.push(`<p>${inlineMarkdown(paragraph.join(" "))}</p>`);
+    html.push(`<p>${inlineMarkdown(paragraph.join(" "), options)}</p>`);
     paragraph = [];
   };
   const closeList = () => {
@@ -2421,7 +2459,7 @@ function markdownToHtml(markdown) {
       flushParagraph();
       closeList();
       closeQuote();
-      html.push(`<h${heading[1].length}>${inlineMarkdown(heading[2])}</h${heading[1].length}>`);
+      html.push(`<h${heading[1].length}>${inlineMarkdown(heading[2], options)}</h${heading[1].length}>`);
       return;
     }
     const listItem = trimmed.match(/^[-*]\s+(.+)$/);
@@ -2432,7 +2470,7 @@ function markdownToHtml(markdown) {
         html.push("<ul>");
         listOpen = true;
       }
-      html.push(`<li>${inlineMarkdown(listItem[1])}</li>`);
+      html.push(`<li>${inlineMarkdown(listItem[1], options)}</li>`);
       return;
     }
     if (trimmed.startsWith(">")) {
@@ -2442,7 +2480,7 @@ function markdownToHtml(markdown) {
         html.push("<blockquote>");
         quoteOpen = true;
       }
-      html.push(`<p>${inlineMarkdown(trimmed.replace(/^>\s?/, ""))}</p>`);
+      html.push(`<p>${inlineMarkdown(trimmed.replace(/^>\s?/, ""), options)}</p>`);
       return;
     }
     paragraph.push(trimmed);
@@ -2463,9 +2501,85 @@ function toggleAuthorPreview() {
   const willShow = preview.hidden;
   preview.hidden = !willShow;
   textarea.hidden = willShow;
-  if (willShow) preview.innerHTML = markdownToHtml(textarea.value);
+  if (willShow) renderAuthorPreview();
   const label = modal.querySelector("[data-author-preview] span");
   if (label) label.textContent = willShow ? "Edit" : "Preview";
+}
+
+function renderAuthorPreview() {
+  const modal = document.querySelector(".blog-author-modal");
+  const preview = modal?.querySelector(".blog-author-preview");
+  const textarea = modal?.querySelector(".blog-author-markdown-input");
+  if (!preview || !textarea) return false;
+
+  preview.innerHTML = markdownToHtml(textarea.value, {
+    authorPreview: true,
+    resourceVersion: authorPreviewResourceVersion,
+  });
+  return true;
+}
+
+function refreshAuthorPreview() {
+  const modal = document.querySelector(".blog-author-modal");
+  const preview = modal?.querySelector(".blog-author-preview");
+  const textarea = modal?.querySelector(".blog-author-markdown-input");
+  if (!preview || !textarea) return;
+
+  preview.hidden = false;
+  textarea.hidden = true;
+  authorPreviewResourceVersion = `${Date.now()}`;
+  renderAuthorPreview();
+  const label = modal.querySelector("[data-author-preview] span");
+  if (label) label.textContent = "Edit";
+  setAuthorStatus("预览已刷新，仅重新请求文中图片等博文资源。");
+}
+
+function removeAuthorMarkdownImageReferences(markdown, imagePath) {
+  return String(markdown || "")
+    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, _alt, source) => (
+      getManagedAuthorImagePath(source) === imagePath ? "" : match
+    ))
+    .replace(/\n{3,}/g, "\n\n");
+}
+
+async function deleteAuthorPreviewImage(imagePath) {
+  const path = getManagedAuthorImagePath(imagePath);
+  const modal = document.querySelector(".blog-author-modal");
+  const textarea = modal?.querySelector(".blog-author-markdown-input");
+  if (!path || !textarea) return;
+  if (!authorSessionState.allowed || !authorSessionState.token) {
+    setAuthorStatus("缺少 GitHub 写入权限。请重新使用 GitHub 登录后再删除图片。", true);
+    return;
+  }
+
+  const fileName = path.split("/").pop() || "该图片";
+  if (!window.confirm(`确定删除 ${fileName} 吗？该图片会从 GitHub 仓库移除，并从当前 Markdown 中删除引用。`)) return;
+
+  const deleteButtons = [...modal.querySelectorAll("[data-author-delete-image]")]
+    .filter((button) => button.dataset.authorDeleteImage === path);
+  deleteButtons.forEach((button) => { button.disabled = true; });
+  setAuthorStatus("正在从 GitHub 删除图片…", false, true);
+
+  try {
+    const commit = await commitFilesToGithub([{ path, delete: true }], `Delete pasted post image: ${fileName}`);
+    const nextMarkdown = removeAuthorMarkdownImageReferences(textarea.value, path);
+    textarea.value = nextMarkdown;
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    renderAuthorPreview();
+    setAuthorStatus(`图片已删除（${commit.sha.slice(0, 7)}），文内引用已移除。请保存博文以发布文章更新。`);
+  } catch (error) {
+    console.warn("Pasted image deletion failed", error);
+    setAuthorStatus(`图片删除失败：${error.message || "请稍后重试。"}`, true);
+  } finally {
+    deleteButtons.forEach((button) => { button.disabled = false; });
+  }
+}
+
+function handleAuthorPreviewClick(event) {
+  const button = event.target.closest("[data-author-delete-image]");
+  if (!button || button.disabled) return;
+  event.preventDefault();
+  deleteAuthorPreviewImage(button.dataset.authorDeleteImage || "");
 }
 
 function createExcerpt(markdown) {
