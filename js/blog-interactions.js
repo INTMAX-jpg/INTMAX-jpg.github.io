@@ -60,9 +60,10 @@ const homeNoteIntroStorageKey = "ZIXI_HOME_NOTE_INTRO_SEEN";
 const analyticsEasterEggStorageKey = "ZIXI_ANALYTICS_EASTER_EGG_SEEN";
 const onboardingLoginPromptStorageKey = "ZIXI_ONBOARDING_LOGIN_PROMPT_DISMISSED";
 const onboardingUserStoragePrefix = "ZIXI_ONBOARDING_DONE";
+const onboardingVisitStoragePrefix = "ZIXI_ONBOARDING_VISIT_SHOWN";
 const onboardingPendingStepStorageKey = "ZIXI_ONBOARDING_PENDING_STEP";
 const onboardingReturnHomeStorageKey = "ZIXI_ONBOARDING_RETURN_HOME";
-const onboardingAlwaysShowForTesting = true;
+const onboardingAlwaysShowForTesting = false;
 let galleryNoteIntroTimer = null;
 let galleryNoteIntroCleanupTimer = null;
 let galleryNoteScrollLocked = false;
@@ -857,6 +858,26 @@ function getOnboardingUserKey(user = currentSession?.user) {
   return `${onboardingUserStoragePrefix}:${user?.id || "anonymous"}`;
 }
 
+function getOnboardingVisitKey(user = currentSession?.user) {
+  return `${onboardingVisitStoragePrefix}:${user?.id || "anonymous"}`;
+}
+
+function hasStartedUserOnboardingThisVisit(user = currentSession?.user) {
+  if (!user?.id) return false;
+  try {
+    return sessionStorage.getItem(getOnboardingVisitKey(user)) === "true";
+  } catch (error) {
+    return false;
+  }
+}
+
+function markUserOnboardingStartedThisVisit(user = currentSession?.user) {
+  if (!user?.id) return;
+  try {
+    sessionStorage.setItem(getOnboardingVisitKey(user), "true");
+  } catch (error) {}
+}
+
 function hasCompletedUserOnboarding(user = currentSession?.user) {
   if (!user?.id) return true;
   try {
@@ -1399,6 +1420,9 @@ function maybeStartUserOnboarding(session = currentSession) {
 
   const pendingStep = getPendingOnboardingStep();
   const shouldReturnHome = hasPendingOnboardingReturnHome();
+  const shouldStartOnGallery = pendingStep > 0 && isGalleryPage();
+  const shouldResumeOnHome = pendingStep > 0 && isHomePage();
+  const shouldResumeCurrentTour = shouldStartOnGallery || shouldResumeOnHome;
   if (shouldReturnHome && !isHomePage()) {
     if (onboardingUserTourShownThisPage) return;
     onboardingUserTourShownThisPage = true;
@@ -1412,10 +1436,7 @@ function maybeStartUserOnboarding(session = currentSession) {
 
   if (shouldReturnHome && isHomePage()) clearPendingOnboardingReturnHome();
   if (onboardingUserTourShownThisPage) return;
-  if (!onboardingAlwaysShowForTesting && hasCompletedUserOnboarding(user)) return;
-
-  const shouldStartOnGallery = pendingStep > 0 && isGalleryPage();
-  const shouldResumeOnHome = pendingStep > 0 && isHomePage();
+  if (hasStartedUserOnboardingThisVisit(user) && !shouldResumeCurrentTour) return;
   if (!isHomePage() && !shouldStartOnGallery) {
     clearPendingOnboardingStep();
     clearPendingOnboardingReturnHome();
@@ -1423,8 +1444,11 @@ function maybeStartUserOnboarding(session = currentSession) {
   }
 
   onboardingUserTourShownThisPage = true;
+  if (!shouldResumeCurrentTour) markUserOnboardingStartedThisVisit(user);
+  const expectedPath = window.location.pathname.replace(/\/index\.html$/, "/");
   window.setTimeout(() => {
-    if (currentSession?.user?.id === user.id && (onboardingAlwaysShowForTesting || !hasCompletedUserOnboarding(user))) {
+    const currentPath = window.location.pathname.replace(/\/index\.html$/, "/");
+    if (currentSession?.user?.id === user.id && currentPath === expectedPath) {
       const startIndex = shouldStartOnGallery || shouldResumeOnHome ? pendingStep : 0;
       startOnboarding("user", getUserOnboardingSteps(), startIndex);
     }
