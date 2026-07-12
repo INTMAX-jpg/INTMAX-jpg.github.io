@@ -64,6 +64,7 @@ const onboardingUserStoragePrefix = "ZIXI_ONBOARDING_DONE";
 const onboardingVisitStoragePrefix = "ZIXI_ONBOARDING_VISIT_SHOWN";
 const onboardingPendingStepStorageKey = "ZIXI_ONBOARDING_PENDING_STEP";
 const onboardingReturnHomeStorageKey = "ZIXI_ONBOARDING_RETURN_HOME";
+const authorGithubProviderTokenStorageKey = "ZIXI_AUTHOR_GITHUB_PROVIDER_TOKEN";
 const onboardingAlwaysShowForTesting = false;
 let galleryNoteIntroTimer = null;
 let galleryNoteIntroCleanupTimer = null;
@@ -1830,18 +1831,35 @@ async function signUpWithAccount() {
 
 async function signInWithGitHub() {
   const supabase = await getSupabaseClient();
-  await supabase.auth.signInWithOAuth({
+  const { error } = await supabase.auth.signInWithOAuth({
     provider: "github",
     options: {
       redirectTo: getAuthRedirectUrl(),
       scopes: "public_repo read:user user:email",
     },
   });
+  if (error) throw error;
+}
+
+async function reconnectAuthorGithub() {
+  if (!isGithubProviderSession(currentSession)) {
+    setAuthorStatus("请使用 GitHub 登录后再连接编辑权限。", true);
+    return;
+  }
+
+  setAuthorStatus("正在连接 GitHub 编辑权限…", false, true);
+  try {
+    await signInWithGitHub();
+  } catch (error) {
+    console.warn("GitHub editor authorization failed", error);
+    setAuthorStatus(`GitHub 连接失败：${error.message || "请稍后重试。"}`, true);
+  }
 }
 
 async function signOut() {
   const supabase = await getSupabaseClient();
   await supabase.auth.signOut();
+  clearAuthorGithubProviderToken();
   currentSession = null;
   updateAuthUI(null);
 }
@@ -1916,26 +1934,58 @@ function isGithubProviderSession(session) {
   return appMeta.provider === "github" || providers.includes("github");
 }
 
+function readAuthorGithubProviderToken() {
+  try {
+    return localStorage.getItem(authorGithubProviderTokenStorageKey) || "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function writeAuthorGithubProviderToken(token) {
+  try {
+    if (token) localStorage.setItem(authorGithubProviderTokenStorageKey, token);
+  } catch (error) {
+    console.warn("GitHub provider token could not be cached", error);
+  }
+}
+
+function clearAuthorGithubProviderToken() {
+  try {
+    localStorage.removeItem(authorGithubProviderTokenStorageKey);
+  } catch (error) {}
+}
+
 function updateAuthorToolVisibility() {
   document.querySelectorAll(".blog-author-tools").forEach((item) => {
     item.hidden = !authorSessionState.allowed;
   });
 }
 
+function updateAuthorEditorConnectionControl() {
+  document.querySelectorAll("[data-author-reconnect-github]").forEach((button) => {
+    button.hidden = Boolean(authorSessionState.token);
+  });
+}
+
 function setAuthorSessionState(nextState) {
   authorSessionState = { ...authorSessionState, ...nextState };
   updateAuthorToolVisibility();
+  updateAuthorEditorConnectionControl();
 }
 
 async function refreshAuthorAccess(session) {
   const login = getGithubLoginFromUser(session?.user);
   const isOwnerMetadata = isGithubProviderSession(session) && login.toLowerCase() === authorEditorConfig.owner.toLowerCase();
-  const token = session?.provider_token || "";
+  const providerToken = session?.provider_token || "";
 
   if (!isOwnerMetadata) {
     setAuthorSessionState({ allowed: false, token: "", login: "", checkedToken: "" });
     return;
   }
+
+  if (providerToken) writeAuthorGithubProviderToken(providerToken);
+  const token = providerToken || readAuthorGithubProviderToken();
 
   setAuthorSessionState({ allowed: true, token, login });
 
@@ -1951,6 +2001,7 @@ async function refreshAuthorAccess(session) {
     });
   } catch (error) {
     console.warn("GitHub owner verification failed", error);
+    clearAuthorGithubProviderToken();
     setAuthorSessionState({ allowed: false, token: "", login: "", checkedToken: "" });
   }
 }
@@ -2004,6 +2055,10 @@ function injectAuthorEditorModal() {
             <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i>
             <span>刷新预览</span>
           </button>
+          <button class="blog-author-secondary" type="button" data-author-reconnect-github hidden>
+            <i class="fa-brands fa-github" aria-hidden="true"></i>
+            <span>重新连接 GitHub</span>
+          </button>
           <button class="blog-author-primary" type="button" data-author-save>
             <i class="fa-regular fa-code-commit" aria-hidden="true"></i>
             <span>保存并commit</span>
@@ -2028,8 +2083,10 @@ function injectAuthorEditorModal() {
   });
   modal.querySelector("[data-author-preview]")?.addEventListener("click", toggleAuthorPreview);
   modal.querySelector("[data-author-refresh-preview]")?.addEventListener("click", refreshAuthorPreview);
+  modal.querySelector("[data-author-reconnect-github]")?.addEventListener("click", reconnectAuthorGithub);
   modal.querySelector(".blog-author-preview")?.addEventListener("click", handleAuthorPreviewClick);
   modal.querySelector("[data-author-save]")?.addEventListener("click", saveAuthorPost);
+  updateAuthorEditorConnectionControl();
 }
 
 function openAuthorEditor(post = null) {
@@ -2548,7 +2605,7 @@ async function deleteAuthorPreviewImage(imagePath) {
   const textarea = modal?.querySelector(".blog-author-markdown-input");
   if (!path || !textarea) return;
   if (!authorSessionState.allowed || !authorSessionState.token) {
-    setAuthorStatus("缺少 GitHub 写入权限。请重新使用 GitHub 登录后再删除图片。", true);
+    setAuthorStatus("缺少 GitHub 编辑令牌。请点击“重新连接 GitHub”后再删除图片。", true);
     return;
   }
 
@@ -3016,7 +3073,7 @@ async function uploadAuthorMarkdownImages(event, sources) {
     return;
   }
   if (!authorSessionState.token) {
-    setAuthorStatus("缺少 GitHub 写入权限。请退出后使用 GitHub 重新登录，并授权仓库访问。", true);
+    setAuthorStatus("缺少 GitHub 编辑令牌。请点击“重新连接 GitHub”完成一次授权，无需退出登录。", true);
     return;
   }
 
@@ -3123,7 +3180,7 @@ async function handleAuthorMarkdownDrop(event) {
 async function saveAuthorPost() {
   try {
     if (!authorSessionState.allowed) throw new Error("Only INTMAX-jpg can use this editor.");
-    if (!authorSessionState.token) throw new Error("GitHub write token is missing. Please sign out, then sign in with GitHub again and approve repository access.");
+    if (!authorSessionState.token) throw new Error("GitHub editing token is missing. Reconnect GitHub from the editor; signing out is not required.");
 
     const values = getEditorValues();
     setAuthorStatus("Preparing GitHub commit...");
@@ -3224,13 +3281,10 @@ async function initAuth() {
 
   try {
     const supabase = await getSupabaseClient();
-    const { data } = await supabase.auth.getSession();
-    currentSession = data.session;
-    updateAuthUI(currentSession);
-
     if (!authListenerInitialized) {
       authListenerInitialized = true;
-      supabase.auth.onAuthStateChange((_event, session) => {
+      supabase.auth.onAuthStateChange((event, session) => {
+        if (event === "SIGNED_OUT") clearAuthorGithubProviderToken();
         currentSession = session;
         updateAuthUI(session);
         randomizeHomeHeroQuote();
@@ -3238,6 +3292,10 @@ async function initAuth() {
         initSiteGuestbook(true);
       });
     }
+
+    const { data } = await supabase.auth.getSession();
+    currentSession = data.session;
+    updateAuthUI(currentSession);
   } catch (error) {
     console.warn("Supabase Auth 初始化失败", error);
     authInitialized = false;
